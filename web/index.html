@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chokxen Face – Iniciar Sesión</title>
+  <link rel="stylesheet" href="style.css?v=7" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+  <div class="bg-layer"></div>
+
+  <!-- VIDEO BACKGROUND: AGUJERO NEGRO (CANVAS JS) -->
+  <div class="video-bg"></div>
+  <div class="video-overlay"></div>
+
+  <div class="top-dropdown" style="position:absolute; top:20px; right:20px; z-index:100;">
+    <button class="btn-secondary" title="Accesos Universitarios"
+      style="background:rgba(20,20,20,0.8); color:#fff; border:1px solid rgba(255,255,255,0.2); font-weight:bold; width:45px; height:45px; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:22px; padding:0;">☰</button>
+    <div class="dropdown-content">
+      <a href="https://moodle.plataforma-utslp.net/" target="_blank">Plataforma Alumnos</a>
+      <a href="https://drive.google.com/drive/folders/1Oyf62ezefTm-1382bHKyFVt46DQqrAA7?usp=drive_link"
+        target="_blank">Carpetas Docentes</a>
+      <a href="https://moodle.plataforma-utslp.net/login/index.php" target="_blank">Plataforma Principal</a>
+    </div>
+  </div>
+  <div class="wrap" style="display:flex; justify-content:center; align-items:center; min-height:80vh;">
+
+    <!-- SINGLE CENTER COLUMN: LOGIN / REGISTRO -->
+    <div class="landing-login" style="width:100%; max-width:400px;">
+      <!-- =================== PASO 1: LOGIN GOOGLE =================== -->
+      <section id="v-auth" class="view active glass-card login-card"
+        style="margin-top:0; display:flex; flex-direction:column; align-items:center;">
+        <div class="logo-area" style="text-align:center;">
+          <img src="img/chokxen_logo.jpg" alt="Chokxen Face" style="max-width:200px; margin-bottom:15px;" />
+          <p class="sub" style="font-size:13px;">Plataforma biométrica empresarial</p>
+        </div>
+
+        <form id="admin-login-form" style="width:100%; margin-bottom:20px;">
+          <div class="input-group" style="text-align:left;">
+            <label style="color:#ccc;">Usuario / Matrícula Docente</label>
+            <input type="text" id="admin-user" placeholder="Ej: admin o maestro" required
+              style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff;" />
+          </div>
+          <div class="input-group" style="text-align:left; margin-top:10px;">
+            <label style="color:#ccc;">Contraseña</label>
+            <input type="password" id="admin-pass" placeholder="Tu clave de acceso" required
+              style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff;" />
+          </div>
+          <button type="submit" class="btn-primary"
+            style="width:100%; margin-top:15px; background:#fff; color:#000;">Acceder</button>
+          <div style="text-align:left; margin-top:10px;">
+            <a href="#" style="color:#a1a1aa; font-size:13px; text-decoration:none;">¿Olvidó su contraseña?</a>
+          </div>
+        </form>
+
+        <hr style="width:100%; border:0; border-top:1px solid rgba(255,255,255,0.1); margin:15px 0;">
+
+        <div style="width:100%; text-align:center; margin-bottom:10px;">
+          <p class="muted text-center mb-2" style="margin-bottom:15px; color:#aaa; font-size:15px;">Identifíquese usando
+            su cuenta en:</p>
+          <div class="gbtn-wrap" style="display:flex; justify-content:center; width:100%;">
+            <div id="gbtn"></div>
+          </div>
+          <p id="ginfo" class="small muted text-center mt-2"></p>
+        </div>
+
+      </section>
+
+      <!-- =================== PASO 2: REGISTRO (CON LIVENESS ESTRICTO) =================== -->
+      <section id="v-register" class="view glass-card login-card" style="margin-top:0; display:none; max-width:460px;">
+        <h2 style="font-size:22px; margin-bottom:4px; text-align:center;">Registro Biométrico Facial</h2>
+        <p class="muted small mb-2 text-center">Sigue cada paso. Sin lentes. Buena iluminación.</p>
+
+        <!-- STEP PROGRESS BAR -->
+        <div id="scan-steps" style="display:flex; gap:6px; margin:0 auto 16px; justify-content:center; flex-wrap:wrap;">
+          <div class="scan-step active" id="step-1"><span>1</span> Datos</div>
+          <div class="scan-step" id="step-2"><span>2</span> Liveness</div>
+          <div class="scan-step" id="step-3"><span>3</span> Frontal</div>
+          <div class="scan-step" id="step-4"><span>4</span> Izquierda</div>
+          <div class="scan-step" id="step-5"><span>5</span> Derecha</div>
+          <div class="scan-step" id="step-6"><span>6</span> Foto Credencial</div>
+        </div>
+
+        <!-- FASE 1: DATOS -->
+        <div id="phase-datos">
+          <div class="input-group"><label>Nombre Completo</label><input id="reg-nombre" placeholder="Ej: Juan Pérez" />
+          </div>
+          <div class="input-group"><label>Matrícula</label><input id="reg-matricula" type="number"
+              placeholder="Ej: 123456" /></div>
+          <div class="input-group">
+            <label>Carrera</label>
+            <select id="reg-carrera" class="form-select">
+              <option value="" disabled selected>-- Selecciona tu carrera --</option>
+              <option value="Ingeniería en Mecatrónica">Ingeniería en Mecatrónica</option>
+              <option value="Ingeniería en Mantenimiento Industrial">Ingeniería en Mantenimiento Industrial</option>
+              <option value="Ingeniería en Procesos Industriales">Ingeniería en Procesos Industriales</option>
+              <option value="Ingeniería en Sistemas Automotrices">Ingeniería en Sistemas Automotrices</option>
+              <option value="Licenciatura en Innovación de Negocios y Mercadotecnia">Licenciatura en Innovación de
+                Negocios y Mercadotecnia</option>
+              <option value="Licenciatura en Diseño y Gestión de Redes Logísticas">Licenciatura en Diseño y Gestión de
+                Redes Logísticas</option>
+              <option value="Tecnologías de la Información">Tecnologías de la Información</option>
+            </select>
+          </div>
+          <button id="btnNextToLiveness" class="btn-primary" style="width:100%; margin-top:8px;">Continuar →</button>
+        </div>
+
+        <!-- FASE 2-5: CÁMARA Y ESCANEO -->
+        <div id="phase-scan" style="display:none;">
+          <!-- Círculo de cámara con overlays de escaner -->
+          <div id="scan-circle-wrap" style="position:relative; width:240px; height:240px; margin:0 auto 12px;">
+            <!-- Anillo animado -->
+            <div id="scan-ring"
+              style="position:absolute; inset:0; border-radius:50%; border:5px solid var(--primary); box-shadow:0 0 30px rgba(0,200,100,0.4); transition: border-color 0.5s, box-shadow 0.5s;">
+            </div>
+            <!-- Video + overlays internos -->
+            <div style="position:absolute; inset:5px; border-radius:50%; overflow:hidden;">
+              <video id="video-reg" autoplay playsinline muted
+                style="width:100%; height:100%; object-fit:cover; transform:scaleX(-1);"></video>
+              <!-- Vignette -->
+              <div
+                style="position:absolute; inset:0; border-radius:50%; box-shadow:inset 0 0 50px rgba(0,0,0,0.5); pointer-events:none;">
+              </div>
+              <!-- Linea de barrido animada -->
+              <div id="scan-line" class="scan-line"></div>
+              <!-- Brackets de deteccion facial -->
+              <div class="scan-brackets">
+                <span class="scan-bracket tl"></span>
+                <span class="scan-bracket tr"></span>
+                <span class="scan-bracket bl"></span>
+                <span class="scan-bracket br"></span>
+              </div>
+              <!-- Texto de estado dentro del circulo (parte inferior) -->
+              <div id="scan-inner-status" class="scan-inner-status">Iniciando...</div>
+            </div>
+            <!-- Flecha direccional -->
+            <div id="scan-arrow"
+              style="position:absolute; font-size:48px; color:var(--primary); filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4)); transition:all 0.5s; display:none; font-weight:900;">
+            </div>
+          </div>
+
+          <!-- Instrucción grande -->
+          <div id="scan-instruction"
+            style="text-align:center; font-size:18px; font-weight:800; color:var(--primary); margin-bottom:8px; min-height:28px;">
+            Preparando cámara...</div>
+          <!-- Sub-instrucción -->
+          <div id="scan-sub"
+            style="text-align:center; font-size:13px; color:#666; margin-bottom:12px; min-height:20px;"></div>
+
+          <!-- Liveness badge -->
+          <div class="liveness-check"
+            style="background:#f4f8f6; padding:10px 14px; border-radius:8px; border:1px solid #cce0d6; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+            <span id="liveness-icon" style="font-size:22px;"></span>
+            <strong style="font-size:13px; flex:1;" id="liveness-msg">Esperando...</strong>
+          </div>
+
+          <!-- Progress bar -->
+          <div style="background:#e8ede9; border-radius:20px; height:8px; overflow:hidden; margin-bottom:12px;">
+            <div id="scan-progress"
+              style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), #00d975); border-radius:20px; transition:width 0.4s;">
+            </div>
+          </div>
+
+          <p id="reg-status" style="text-align:center; font-weight:600; font-size:13px; color:#666; min-height:20px;"></p>
+        </div>
+
+        <!-- FASE 6: FOTO DE CREDENCIAL -->
+        <div id="phase-credencial" style="display:none; text-align:center; padding:10px 0;">
+          <p style="font-size:15px; font-weight:700; color:#e2e8f0; margin-bottom:8px;">Paso final: Foto para tu Credencial Institucional</p>
+          <p style="font-size:12px; color:#94a3b8; margin-bottom:16px;">Mantente de frente, con buena iluminacion. Esta foto aparecer en tu credencial digital.</p>
+          <div style="position:relative; width:200px; height:240px; margin:0 auto 16px; border:3px solid var(--primary); border-radius:8px; overflow:hidden; background:#000;">
+            <video id="video-cred" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover; transform:scaleX(-1);"></video>
+            <div style="position:absolute; inset:0; border:3px dashed rgba(255,255,255,0.2); pointer-events:none;"></div>
+          </div>
+          <canvas id="canvas-cred" style="display:none;"></canvas>
+          <button id="btn-tomar-foto" class="btn-primary" style="width:100%; margin-bottom:8px;">Tomar Foto de Credencial</button>
+          <div id="cred-preview" style="display:none; text-align:center; margin-bottom:12px;">
+            <img id="cred-preview-img" style="width:150px; height:180px; object-fit:cover; border:2px solid var(--primary); border-radius:8px; margin:0 auto;" />
+            <p style="font-size:12px; color:#94a3b8; margin-top:6px;">Vista previa. Si no te gusta, toma otra.</p>
+            <button id="btn-retomar-foto" onclick="window.retakeCredPhoto()" style="background:none; border:1px solid #555; color:#aaa; padding:6px 16px; border-radius:8px; font-size:12px; cursor:pointer; margin-top:4px;">Tomar de nuevo</button>
+          </div>
+          <button id="btn-subir-foto" class="btn-primary" style="width:100%; display:none;">Guardar Foto y Entrar al Portal</button>
+          <p id="cred-status" style="color:#aaa; font-size:12px; min-height:18px; margin-top:8px;"></p>
+        </div>
+      </section>
+    </div> <!-- End landing-login -->
+
+  </div> <!-- End Wrap -->
+
+  <!-- =================== ASISTENTE FAQ (OFFLINE) =================== -->
+  <button id="chatbot-toggle" title="Mesa de Ayuda">?</button>
+  <div id="chatbot-window" class="glass-card chatbot-window">
+    <div class="chat-header">
+      <h4>Mesa de Ayuda Chokxen</h4>
+      <button id="chatbot-close" class="btn-text" style="color:white;">X</button>
+    </div>
+    <div id="chat-messages" class="chat-messages">
+      <div class="bot-msg">Hola, soy el asistente de Chokxen Face. Escribe tu duda o selecciona un tema:<br><br>
+        <button class="faq-chip" onclick="faqAnswer('que_es')">Que es Chokxen Face</button>
+        <button class="faq-chip" onclick="faqAnswer('registro')">Como me registro</button>
+        <button class="faq-chip" onclick="faqAnswer('liveness')">Que es Liveness</button>
+        <button class="faq-chip" onclick="faqAnswer('login')">Como inicio sesion</button>
+        <button class="faq-chip" onclick="faqAnswer('faltas')">Sobre las faltas</button>
+        <button class="faq-chip" onclick="faqAnswer('maestro')">Soy maestro</button>
+      </div>
+    </div>
+    <div class="chat-input-area" style="display:flex; gap:8px;">
+      <input type="text" id="chat-input" placeholder="Escribe tu pregunta..." autocomplete="off" style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:13px; outline:none;" />
+      <button id="chat-send" class="btn-primary" style="padding:10px 18px; white-space:nowrap; font-size:18px;">&#9992;</button>
+    </div>
+  </div>
+
+  <style>
+    .faq-chip {
+      display:inline-block; margin:4px 2px; padding:6px 12px; border-radius:20px;
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);
+      color:#e2e8f0; font-size:12px; cursor:pointer; transition:all 0.2s;
+    }
+    .faq-chip:hover { background:var(--primary); color:#000; border-color:var(--primary); }
+    .bot-msg { background:rgba(255,255,255,0.06); padding:12px 14px; border-radius:12px; font-size:13px; color:#e2e8f0; line-height:1.6; }
+    .user-msg { background:var(--primary); color:#000; padding:10px 14px; border-radius:12px; font-size:13px; align-self:flex-end; font-weight:600; max-width:80%; }
+  </style>
+
+  <!-- =================== FOOTER OFICIAL =================== -->
+  <footer
+    style="width:100%; padding:40px 20px; text-align:center; position:relative; z-index:10; background:rgba(10,14,20,0.8); border-top:1px solid rgba(255,255,255,0.05); margin-top:40px;">
+    <div
+      style="max-width:1200px; margin:0 auto; display:flex; flex-wrap:wrap; justify-content:space-around; gap:20px; text-align:left;">
+      <div style="flex:1; min-width:250px;">
+        <h4 style="color:#ffffff; margin-bottom:10px;">Informacion Institucional</h4>
+        <p style="color:#94a3b8; font-size:14px; margin:5px 0;">Modalidad Mixta</p>
+        <p style="margin:5px 0;"><a href="https://utslp.edu.mx" target="_blank"
+            style="color:#d1d5db; font-size:14px; text-decoration:none;">Sitio oficial UTSLP</a></p>
+        <p style="margin:5px 0;"><a href="https://plataforma-utslp.net" target="_blank"
+            style="color:#d1d5db; font-size:14px; text-decoration:none;">Sitio oficial Plataforma</a></p>
+      </div>
+      <div style="flex:2; min-width:300px;">
+        <h4 style="color:#ffffff; margin-bottom:10px;">Desarrollador Oficial</h4>
+        <img src="img/chokxen_logo.png" alt="Chokxen Face" style="max-height:45px; margin-bottom:10px;" />
+        <p style="color:#94a3b8; font-size:14px; margin:5px 0;">Proveedor tecnologico de acceso biometrico avanzado.</p>
+        <p style="color:#94a3b8; font-size:14px; margin:5px 0;">Correo electronico : <a
+            href="mailto:administrador@plataforma-utslp.net"
+            style="color:#d1d5db; text-decoration:none;">administrador@plataforma-utslp.net</a></p>
+      </div>
+    </div>
+    <div
+      style="margin-top:30px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05); color:#64748b; font-size:13px; display:flex; justify-content:center; align-items:center; gap:10px;">
+      Copyright 2026 - Desarrollado por <strong style="color:#fff;">CHOKXEN</strong>
+    </div>
+  </footer>
+
+  <script src="app_auth.js?v=4"></script>
+  <script src="blackhole.js"></script>
+
+  <!-- ASISTENTE FAQ OFFLINE (no usa chatbot.js que es el foro) -->
+  <script>
+  (function(){
+    const toggleBtn = document.getElementById("chatbot-toggle");
+    const chatWin = document.getElementById("chatbot-window");
+    const chatClose = document.getElementById("chatbot-close");
+    const chatInput = document.getElementById("chat-input");
+    const chatSend = document.getElementById("chat-send");
+    const chatMessages = document.getElementById("chat-messages");
+
+    if(toggleBtn && chatWin){
+      toggleBtn.addEventListener("click", () => { chatWin.classList.add("open"); toggleBtn.style.display="none"; });
+      if(chatClose) chatClose.addEventListener("click", () => { chatWin.classList.remove("open"); toggleBtn.style.display="flex"; });
+    }
+
+    const FAQ = {
+      que_es: "Chokxen Face es una plataforma biometrica de acceso facial desarrollada para la UTSLP. Permite a los alumnos registrarse con reconocimiento facial, llevar el control de asistencia, consultar faltas, acceder a la biblioteca academica y obtener su credencial digital.",
+      registro: "Para registrarte necesitas:<br>1. Inicia sesion con tu cuenta de Google institucional<br>2. Completa tus datos (nombre, matricula, carrera)<br>3. Pasa la prueba de vida (parpadea 2 veces frente a la camara)<br>4. Permite que el sistema capture tus fotos faciales<br>5. Toma tu foto de credencial<br><br>Una vez completado, podras acceder con tu rostro.",
+      liveness: "La prueba de Liveness (prueba de vida) verifica que eres una persona real y no una fotografia. El sistema te pedira que parpadees 2 veces frente a la camara. Esto previene suplantacion de identidad y asegura la integridad biometrica del sistema.",
+      login: "Tienes varias formas de acceder:<br><br><strong>Alumnos:</strong> Usa tu cuenta de Google institucional para iniciar sesion. Si ya tienes registro facial, el sistema te reconocera automaticamente.<br><br><strong>Maestros/Admin:</strong> Usa tu usuario y contrasena en el formulario de la izquierda.",
+      faltas: "El sistema registra tus entradas y salidas automaticamente mediante reconocimiento facial. Las faltas las puede agregar un maestro o administrador. Tienes un semaforo de colores:<br>- Verde: 0-2 faltas<br>- Amarillo: 3-4 faltas<br>- Rojo: 5+ faltas<br><br>Puedes justificar faltas con tu maestro.",
+      maestro: "Si eres docente, inicia sesion con tu usuario y contrasena en el formulario. Desde tu panel podras:<br>- Ver la lista de alumnos y sus faltas<br>- Agregar faltas manualmente<br>- Acceder a la Biblioteca Academica<br>- Ver tu Credencial Digital<br>- Participar en el Foro General",
+      default: "No tengo informacion exacta sobre eso, pero puedes intentar con estos temas: registro, liveness, como iniciar sesion, faltas, o informacion para maestros. Tambien puedes escribir a administrador@plataforma-utslp.net para soporte directo."
+    };
+
+    function addMsg(text, isUser){
+      const div = document.createElement("div");
+      div.className = isUser ? "user-msg" : "bot-msg";
+      div.innerHTML = text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    window.faqAnswer = function(key){
+      addMsg(FAQ[key] || FAQ.default, false);
+    };
+
+    function processQuestion(text){
+      const q = text.toLowerCase();
+      addMsg(text, true);
+      setTimeout(() => {
+        if(q.includes("chokxen") || q.includes("que es") || q.includes("plataforma") || q.includes("sistema")) addMsg(FAQ.que_es, false);
+        else if(q.includes("registro") || q.includes("registrar") || q.includes("inscrib")) addMsg(FAQ.registro, false);
+        else if(q.includes("liveness") || q.includes("vida") || q.includes("parpadeo") || q.includes("parpad")) addMsg(FAQ.liveness, false);
+        else if(q.includes("entrar") || q.includes("sesion") || q.includes("login") || q.includes("acceder") || q.includes("iniciar")) addMsg(FAQ.login, false);
+        else if(q.includes("falta") || q.includes("asistencia") || q.includes("semaforo") || q.includes("justific")) addMsg(FAQ.faltas, false);
+        else if(q.includes("maestro") || q.includes("docente") || q.includes("profesor") || q.includes("profe")) addMsg(FAQ.maestro, false);
+        else addMsg(FAQ.default, false);
+      }, 400);
+    }
+
+    if(chatSend) chatSend.addEventListener("click", () => {
+      const val = chatInput.value.trim();
+      if(!val) return;
+      processQuestion(val);
+      chatInput.value = "";
+    });
+    if(chatInput) chatInput.addEventListener("keydown", e => {
+      if(e.key === "Enter") { e.preventDefault(); chatSend.click(); }
+    });
+  })();
+  </script>
+</body>
+
+</html>

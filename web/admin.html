@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Chokxen Face – Panel Administrador</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="circles-anim">
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+    <div class="circle circle-3"></div>
+  </div>
+
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <span class="topnav-logo">Chokxen <strong>Face</strong> · Admin</span>
+      <div class="topnav-right">
+        <span class="topnav-user" id="admin-email-nav">Admin</span>
+        <button id="btn-logout-ad" class="btn-danger btn-sm">Cerrar Sesión</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <h2 class="page-title">Panel de Administrador</h2>
+    
+    <!-- Resumen rápido -->
+    <div class="stats-row mb-2" id="admin-stats-row"></div>
+
+    <!-- Agregar falta manual -->
+    <div class="glass-module mb-2">
+      <h3>➕ Agregar Falta Manual</h3>
+      <div class="form-row">
+        <div class="input-group" style="flex:0 0 140px;">
+          <label>ID Alumno</label>
+          <input id="admin-falta-id" type="number" placeholder="Selecciona de tabla"/>
+        </div>
+        <div class="input-group" style="flex:0 0 170px;">
+          <label>Fecha</label>
+          <input id="admin-falta-fecha" type="date"/>
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>Razón (Opcional)</label>
+          <input id="admin-falta-razon" placeholder="Inasistencia, justificada..."/>
+        </div>
+        <button id="btn-add-falta" class="btn-primary" style="align-self:flex-end;">Aplicar Falta</button>
+      </div>
+      <p id="admin-status" class="small mt-1 text-warning"></p>
+    </div>
+
+    <!-- Biblioteca Educativa (Maestros) -->
+    <div class="glass-module mb-2">
+      <h3>📚 Biblioteca Educativa</h3>
+      <p class="text-muted small mb-2">Busca recursos, libros y manuales en Google Books para tus clases.</p>
+      
+      <div class="form-row" style="margin-bottom:15px;">
+        <div class="input-group" style="flex:1;">
+          <input id="gbooks-query" type="text" placeholder="Ej. Didáctica, Pedagogía, Matemáticas..." onkeypress="if(event.key==='Enter') searchGoogleBooks()"/>
+        </div>
+        <button class="btn-primary" onclick="searchGoogleBooks()" style="align-self:flex-end;">Buscar Libros</button>
+      </div>
+      
+      <div id="gbooks-results" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:15px;">
+        <p id="gbooks-empty" style="color:#888; grid-column:1/-1; text-align:center; padding:15px 0;">Mostrando libros populares de educación por defecto.</p>
+      </div>
+    </div>
+
+    <!-- Tabla de alumnos -->
+    <div class="glass-module">
+      <div class="dash-header">
+        <h3>Lista de Alumnos Registrados</h3>
+        <input id="admin-search" placeholder="🔍 Buscar por nombre o matrícula..." 
+               style="max-width:260px;" oninput="filterAdmin(this.value)"/>
+      </div>
+      <div class="table-wrap">
+        <table id="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Matrícula</th><th>Nombre</th><th>Carrera</th>
+              <th style="text-align:center;">Faltas</th>
+              <th style="text-align:center;">Semáforo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="7" class="text-center muted">Cargando lista...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

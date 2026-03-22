@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Chokxen Face – Supremo Master</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- VIDEO BACKGROUND -->
+  <div class="video-bg">
+    <iframe src="https://www.youtube.com/embed/QwLio8-xT0Q?autoplay=1&mute=1&loop=1&playlist=QwLio8-xT0Q&controls=0&showinfo=0&disablekb=1&modestbranding=1&vq=hd1080" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+  </div>
+  <div class="video-overlay"></div>
+
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <span class="topnav-logo">Chokxen <strong>Face</strong> · <span style="color:var(--danger)">Supremo</span></span>
+      <div class="topnav-right">
+        <span class="topnav-user" id="master-email-nav">Admin Maestro</span>
+        <button id="btn-logout-master" class="btn-danger btn-sm">Cerrar Sesión</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <h2 class="page-title" style="color:var(--danger)">Control de Base de Datos</h2>
+    <p class="muted mb-2 text-center">Zona de peligro: Las acciones aquí son irreversibles.</p>
+
+    <!-- Tabla de alumnos a eliminar -->
+    <div class="glass-module border-danger">
+      <div class="dash-header">
+        <h3>Gestión de Alumnos Registrados</h3>
+        <input id="master-search" placeholder="🔍 Buscar por nombre o matrícula..." 
+               style="max-width:260px;" oninput="filterMaster(this.value)"/>
+      </div>
+      <div class="table-wrap">
+        <table id="master-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Matrícula</th><th>Nombre</th><th>Carrera</th>
+              <th>Acciones Peligrosas</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="5" class="text-center muted">Cargando base de datos...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    
+  </div>
+
+  <script src="master.js"></script>
+  <script src="blackhole.js"></script>
+</body>
+</html>

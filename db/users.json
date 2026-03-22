@@ -1,0 +1,14 @@
+{
+  "users": {
+    "admin": {
+      "name": "sergio",
+      "pass_hash": "25f43b1486ad95a1398e3eeb3d83bc4010015fcc9bedb35b432e00298d5021f7",
+      "created": "2026-03-19 15:47:33"
+    },
+    "sergiox": {
+      "name": "sergio",
+      "pass_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+      "created": "2026-03-21 13:27:40"
+    }
+  }
+}

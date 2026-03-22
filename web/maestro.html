@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Chokxen Face – Panel Docente</title>
+  <link rel="stylesheet" href="style.css?v=8"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- VIDEO BACKGROUND -->
+  <div class="video-bg">
+    <iframe src="https://www.youtube.com/embed/QwLio8-xT0Q?autoplay=1&mute=1&loop=1&playlist=QwLio8-xT0Q&controls=0&showinfo=0&disablekb=1&modestbranding=1&vq=hd1080" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+  </div>
+  <div class="video-overlay"></div>
+
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <span class="topnav-logo">Chokxen <strong>Face</strong> · Docente</span>
+      <div class="topnav-right">
+        <span class="topnav-user" id="admin-email-nav">Maestro</span>
+        <button id="maestro-cred-btn" title="Mi Credencial" style="width:105px; height:36px; border-radius:20px; font-size:12px; font-weight:700; background:linear-gradient(45deg, #10b981, #059669); border:none; color:#fff; cursor:pointer; box-shadow:0 3px 10px rgba(16,185,129,0.3); transition:all 0.2s; white-space:nowrap; margin-right:5px;" onclick="try{ document.getElementById('modal-maestro-idcard').style.display='flex'; if(typeof generateMaestroQR === 'function') generateMaestroQR(); }catch(e){console.error(e);}">Mi Credencial</button>
+        <button id="btn-logout-ad" class="btn-danger btn-sm">Cerrar Sesión</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <h2 class="page-title">Panel de Maestro</h2>
+    
+    <!-- Resumen rápido -->
+    <div class="stats-row mb-2" id="admin-stats-row"></div>
+
+    <!-- Tabla de alumnos -->
+    <div class="glass-module mb-2">
+      <div class="dash-header">
+        <h3>Lista de Alumnos Registrados</h3>
+        <input id="admin-search" placeholder="🔍 Buscar por nombre o matrícula..." 
+               style="max-width:260px;" oninput="filterAdmin(this.value)"/>
+      </div>
+      <div class="table-wrap">
+        <table id="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Matrícula</th><th>Nombre</th><th>Carrera</th>
+              <th style="text-align:center;">Faltas</th>
+              <th style="text-align:center;">Semáforo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="7" class="text-center muted">Cargando lista...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Agregar falta manual -->
+    <div class="glass-module mb-2">
+      <h3>Agregar Falta Manual</h3>
+      <div class="form-row">
+        <div class="input-group" style="flex:0 0 140px;">
+          <label>ID Alumno</label>
+          <input id="admin-falta-id" type="number" placeholder="Selecciona de tabla"/>
+        </div>
+        <div class="input-group" style="flex:0 0 170px;">
+          <label>Fecha</label>
+          <input id="admin-falta-fecha" type="date"/>
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>Razón (Opcional)</label>
+          <input id="admin-falta-razon" placeholder="Inasistencia, justificante..."/>
+        </div>
+        <button id="btn-add-falta" class="btn-primary" style="align-self:flex-end;">Aplicar Falta</button>
+      </div>
+      <p id="admin-status" class="small mt-1 text-warning"></p>
+    </div>
+
+    <!-- Justificar falta manual (por matrícula) -->
+    <div class="glass-module mb-2">
+      <h3 style="color: var(--danger);">Justificar Inasistencia</h3>
+      <p class="muted small mb-2">Restar la inasistencia más reciente de un alumno mediante su clave/matrícula oficial.</p>
+      <div class="form-row">
+        <div class="input-group" style="flex:1;">
+          <label>Matrícula del Alumno</label>
+          <input id="admin-justificar-mat" type="text" placeholder="Ej. 21674"/>
+        </div>
+        <button id="btn-justificar" class="btn-sm" style="background:var(--danger); border:none; color:white; padding:0 20px; border-radius:10px; align-self:flex-end; font-weight:bold; cursor:pointer; height:38px;">Justificar</button>
+      </div>
+      <p id="justificar-status" class="small mt-1"></p>
+    </div>
+
+    <!-- Avisos Institucionales -->
+    <div class="glass-module mb-2">
+      <h3>Avisos Institucionales</h3>
+      <p class="muted small mb-2">Notificaciones y circulares oficiales del campus para la plantilla docente.</p>
+      
+      <div id="avisos-container" style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Javascript will populate this -->
+        <p class="text-center muted">Cargando avisos...</p>
+      </div>
+    </div>
+
+    <!-- Foro Global Estático fue reemplazado por la ventana flotante abajo -->
+
+    <!-- Beneficios y Certificaciones Docentes -->
+    <div class="glass-module mb-2 full-width">
+      <h3>Beneficios y Herramientas Docentes</h3>
+      <p class="muted small mb-2">Desarrollo continuo y recursos exclusivos para facilitar tu labor diaria.</p>
+      
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:15px;">
+        
+        <!-- Maestrias Descuento -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <img src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=200&fit=crop" style="width:100%; height:100px; object-fit:cover;" alt="Maestría">
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:var(--warning);">Maestrías Beca 50%</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Convenio con universidades aliadas para programas de Maestría en Educación.</p>
+            <button class="btn-primary btn-sm" style="width:100%;" onclick="alert('Solicitud enviada a Recursos Humanos.')">Solicitar Beca</button>
+          </div>
+        </div>
+
+        <!-- Google for Education -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?w=400&h=200&fit=crop" style="width:100%; height:100px; object-fit:cover;" alt="Google Educator">
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:#4285F4;">Google Educator Nivel 1, 2</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Váuchers de certificación oficial y cursos gratuitos patrocinados.</p>
+            <button class="btn-primary btn-sm" style="width:100%; background:#4285F4; color:#fff;" onclick="window.open('https://edu.google.com/intl/es-419_ALL/for-educators/certification-programs/','_blank')">Ver Certificación</button>
+          </div>
+        </div>
+        
+        <!-- Microsoft Learn -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <img src="https://images.unsplash.com/photo-1633419461186-7d40a38105ec?w=400&h=200&fit=crop" style="width:100%; height:100px; object-fit:cover;" alt="Microsoft">
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:#00a4ef;">Microsoft MIEE</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Conviértete en un educador innovador experto de Microsoft y gana insignias de prestigio.</p>
+            <button class="btn-primary btn-sm" style="width:100%; background:#00a4ef; color:#fff;" onclick="window.open('https://learn.microsoft.com/es-mx/training/educator-center/','_blank')">Inscribirse</button>
+          </div>
+        </div>
+
+        <!-- YouTube Teachers -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <img src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=200&fit=crop" style="width:100%; height:100px; object-fit:cover;" alt="YouTube Teachers">
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:#ef4444;">YouTube para Docentes</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Canal privado con talleres grabados de pedagogía y manejo de estrés.</p>
+            <button class="btn-primary btn-sm" style="width:100%; background:#ef4444; color:#fff;" onclick="window.open('https://www.youtube.com/playlist?list=PLBGBuKhQvGZz9T3i6YjM0w243Lq-1hI97','_blank')">Ir al Canal</button>
+          </div>
+        </div>
+        
+        <!-- IA para generar exámenes -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <div style="height:100px; background:linear-gradient(45deg, #8b5cf6, #3b82f6); display:flex; align-items:center; justify-content:center;">
+             <span style="font-size:40px;">🤖</span>
+          </div>
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:#a78bfa;">Generador Exámenes IA</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Automatiza la creación de reactivos de opción múltiple usando IA con tu planificador.</p>
+            <button class="btn-primary btn-sm" style="width:100%; background:#8b5cf6; color:#fff;" onclick="alert('Funcionalidad en desarrollo por el equipo de TI.')">Crear Examen</button>
+          </div>
+        </div>
+        
+        <!-- Canva EDU -->
+        <div class="glass-module" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:0; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+          <div style="height:100px; background:linear-gradient(45deg, #0cecfb, #0e85ec); display:flex; align-items:center; justify-content:center;">
+             <span style="font-size:40px;">🎨</span>
+          </div>
+          <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+            <h4 style="margin:0 0 8px 0; color:#0cecfb;">Canva For Education Pro</h4>
+            <p style="font-size:12px; color:#ccc; margin-bottom:12px; flex:1;">Licencia vitalicia gratuita con tu correo docente de la universidad.</p>
+            <button class="btn-primary btn-sm" style="width:100%; background:#0e85ec; color:#fff;" onclick="window.open('https://www.canva.com/education/','_blank')">Reclamar Licencia</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Buscador Google Books -->
+    <div class="glass-module full-width">
+      <h3>Biblioteca Academica</h3>
+      <p style="font-size:12px; color:#888; margin-bottom:12px;">Libros mas consultados en tu area. Busca cualquier tema con Google Books.</p>
+      <div style="display:flex; gap:8px; margin-bottom:15px;">
+        <input type="text" id="gbooks-query" placeholder="Buscar libros: redes, calculo, programacion, base de datos..." style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:13px; outline:none;" onkeydown="if(event.key==='Enter') searchGoogleBooks()">
+        <button class="btn-primary btn-sm" onclick="searchGoogleBooks()" style="white-space:nowrap; padding:10px 18px;">Buscar</button>
+      </div>
+      <div id="gbooks-results" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:12px; max-height:400px; overflow-y:auto;"></div>
+      <p id="gbooks-empty" style="display:none; text-align:center; color:#888; font-size:13px; padding:20px 0;">Escribe un tema para buscar libros academicos.</p>
+    </div>
+  </div>
+
+  <!-- Botón flotante del Foro General (fuera del nav para que position:fixed funcione) -->
+  <button id="chatbot-toggle" title="Foro General">💬</button>
+  <div id="chatbot-window" class="glass-card chatbot-window">
+    <div class="chat-header">
+      <h4>Foro General Institucional</h4>
+      <button id="chatbot-close" class="btn-text" style="color:white;">X</button>
+    </div>
+    <div id="chat-messages" class="chat-messages" style="display:flex; flex-direction:column; gap:8px;">
+      <p style="text-align:center; color:#888; font-size:12px; margin-top:20px;">Cargando mensajes...</p>
+    </div>
+    <div class="chat-input-area" style="display:flex; gap:8px;">
+      <input type="text" id="chat-input" placeholder="Escribe al foro grupal..." autocomplete="off" style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:13px; outline:none;" />
+      <button id="chat-send" class="btn-primary" style="padding:10px 18px; white-space:nowrap; font-size:18px;">&#9992;</button>
+    </div>
+  </div>
+
+  <!-- MODAL CREDENCIAL VIRTUAL MAESTRO -->
+  <div id="modal-maestro-idcard" class="modal-overlay" style="display:none; align-items:center; justify-content:center; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.88); backdrop-filter:blur(6px);" onclick="if(event.target===this)this.style.display='none'">
+    <div style="position:relative; width:100%; max-width:380px; display:flex; flex-direction:column; align-items:center;">
+      <button style="position:absolute; top:-45px; right:10px; z-index:100; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:14px; padding:6px 14px; border-radius:8px; cursor:pointer; backdrop-filter:blur(4px);" onclick="document.getElementById('modal-maestro-idcard').style.display='none'">Cerrar</button>
+      
+      <div class="card-scene">
+        <div class="id-card" onclick="this.classList.toggle('is-flipped')">
+          
+          <!-- FRENTE DOCENTE -->
+          <div class="card-face card-front" style="padding:0; display:flex; flex-direction:column; color:#1a1a1a; background:#f5f5f0; overflow:hidden;">
+            <div class="id-hologram"></div>
+            <div style="position:absolute; top:-30px; right:-30px; width:180px; height:180px; background:linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); transform:rotate(20deg); opacity:0.85; z-index:0;"></div>
+            
+            <!-- Logo UTSLP y Encabezado -->
+            <div style="position:relative; z-index:2; padding:18px 20px 8px; display:flex; align-items:center; gap:10px;">
+              <div style="width:60px; height:60px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.15); flex-shrink:0; overflow:hidden;">
+                <img src="img/logo_utslp.png" alt="UTSLP Logo" style="width:100%; height:100%; object-fit:contain;">
+              </div>
+              <div style="font-size:9px; color:#555; line-height:1.3; font-weight:700;">
+                UNIVERSIDAD<br>TECNOLÓGICA DE<br>SAN LUIS POTOSÍ
+              </div>
+            </div>
+            
+            <div style="position:relative; z-index:2; text-align:center; padding:5px 20px 0; flex:1;">
+              <p style="margin:0; font-size:14px; font-weight:800; letter-spacing:2px; color:#10b981;">DOCENTE</p>
+              <p id="maestro-idcard-name" style="margin:10px 0 0; font-size:16px; font-weight:800; color:#1a1a1a; text-transform:uppercase; letter-spacing:0.5px; line-height:1.2;">---</p>
+            </div>
+
+            <!-- QR Code -->
+            <div style="position:relative; z-index:2; display:flex; justify-content:center; padding:16px 0;">
+              <div style="background:#fff; padding:6px; border:1px solid #ddd; border-radius:4px; position:relative;">
+                <div id="maestro-idcard-qrcode"></div>
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:26px; height:26px; background:#fff; border-radius:5px; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 4px rgba(0,0,0,0.4); z-index:10;">
+                  <img src="img/logo_utslp.png" style="width:100%; height:100%; object-fit:contain;" />
+                </div>
+              </div>
+            </div>
+
+            <div style="position:relative; z-index:2; background:rgba(245,245,240,0.95); padding:8px 15px 14px; text-align:center; border-top:1px solid #ddd;">
+              <p style="margin:0; font-size:10px; color:#333; line-height:1.3; font-weight:600;">PLANTILLA ACADÉMICA UT</p>
+            </div>
+          </div>
+          
+          <!-- REVERSO DOCENTE -->
+          <div class="card-face card-back" style="background:linear-gradient(135deg, #f0fdf4 0%, #ccfbf1 100%); color:#1a1a1a; padding:0; overflow:hidden;">
+            <div style="position:relative; z-index:2; padding:25px 20px 15px; flex:1; display:flex; flex-direction:column; align-items:center;">
+              <div style="width:50px; height:50px; margin-bottom:10px;">
+                <img src="img/logo_utslp.png" style="width:100%; height:100%; object-fit:contain; opacity:0.8;">
+              </div>
+              <h4 style="margin:0 0 10px; color:#059669; font-weight:800; font-size:14px; text-transform:uppercase;">Política de Calidad</h4>
+              <p style="font-size:11px; color:#444; line-height:1.6; margin:0 0 15px; text-align:center; font-style:italic;">
+                "Proporcionar educación superior y servicios tecnológicos de calidad y pertinencia, que cumplan con las expectativas de nuestros clientes, mejorando los procesos permanentemente."
+              </p>
+            </div>
+            
+            <div style="position:relative; z-index:2; padding:10px 20px; text-align:center; background:rgba(5,150,105,0.9);">
+              <p style="margin:0; font-size:12px; color:#fff; font-weight:700; letter-spacing:1px;">VIGENCIA: 2024 - 2028</p>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      <p style="color:#e2e8f0; font-size:13px; margin-top:20px; font-weight:600;">Toca la credencial para voltearla</p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="chatbot.js?v=5"></script>
+  <script src="maestro.js?v=5"></script>
+  <script src="blackhole.js"></script>
+</body>
+</html>
