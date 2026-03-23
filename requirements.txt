@@ -6,3 +6,4 @@ requests
 google-auth
 pydantic
 python-multipart
+psycopg2-binary

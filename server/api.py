@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import json
 import time
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -34,6 +35,7 @@ DATASET_DIR = ROOT_DIR / "dataset"
 MODEL_FILE = ROOT_DIR / "lbph_model.yml"
 LABELS_FILE = ROOT_DIR / "labels.json"
 DB_FILE = ROOT_DIR / "faceaccess.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://chokxendb_user:GLD4m051COriiioynGz34jUMgWtkwXbx@dpg-d70bp7f5gffc73dpj35g-a.oregon-postgres.render.com/chokxendb")
 TRIVIA_FILE = ROOT_DIR / "server" / "trivia_bank.json"
 
 FACE_SIZE = (200, 200)
@@ -65,8 +67,32 @@ def ensure_dirs() -> None:
     DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def db() -> sqlite3.Connection:
-    con = sqlite3.connect(str(DB_FILE))
+class PostgresWrapper:
+    def __init__(self):
+        self.con = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
+        self.con.autocommit = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def execute(self, query, params=()):
+        # Replace ? with %s for Postgres
+        query = query.replace('?', '%s')
+        cur = self.con.cursor()
+        cur.execute(query, params)
+        return cur
+        
+    def commit(self):
+        self.con.commit()
+        
+    def close(self):
+        self.con.close()
+
+def db():
+    con = PostgresWrapper()
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS students (
@@ -75,14 +101,15 @@ def db() -> sqlite3.Connection:
             nombre TEXT,
             carrera TEXT,
             email TEXT,
-            created_at TEXT
+            created_at TEXT,
+            photo_base64 TEXT
         )
         """
     )
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             ts TEXT,
             student_id INTEGER,
             matricula TEXT,
@@ -97,53 +124,52 @@ def db() -> sqlite3.Connection:
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS absences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             student_id INTEGER,
             date TEXT,
             reason TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             student_id INTEGER,
             is_from_student BOOLEAN,
             text TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS global_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             sender_id TEXT,
             sender_name TEXT,
             sender_role TEXT,
             text TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS trivia_answers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             student_id INTEGER,
             date TEXT,
             question_key TEXT,
             answer_idx INTEGER,
             correct BOOLEAN,
             points REAL DEFAULT 0,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(student_id, date)
         )
         """
     )
-    con.commit()
     return con
 
 
@@ -625,7 +651,14 @@ def student_dashboard(session_token: str = Header(...)):
     labels = load_labels()
     student_info = labels.get("students", {}).get(str(sid), {})
 
-    has_uploaded_photo = (DATASET_DIR / str(sid) / "profile.jpg").exists()
+    con_db = db()
+    cur_db = con_db.execute("SELECT photo_base64 FROM students WHERE id=%s", (sid,))
+    row_db = cur_db.fetchone()
+    con_db.close()
+    
+    has_uploaded_photo = (row_db is not None and row_db["photo_base64"] is not None)
+    if not has_uploaded_photo:
+        has_uploaded_photo = (DATASET_DIR / str(sid) / "profile.jpg").exists()
 
     return {
         "ok": True,
@@ -651,16 +684,22 @@ def generate_google_pass(student_id: int):
 
 @api_router.get("/admin/student/{student_id}/photo")
 def get_student_photo(student_id: int):
+    con = db()
+    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (student_id,))
+    row = cur.fetchone()
+    con.close()
+    if row and row["photo_base64"]:
+        import io
+        from fastapi.responses import StreamingResponse
+        img_data = base64.b64decode(row["photo_base64"])
+        return StreamingResponse(io.BytesIO(img_data), media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
+        
     folder = DATASET_DIR / str(student_id)
     if folder.exists() and folder.is_dir():
-        # Dar prioridad a la foto oficial perfil si el usuario la ha subido
         profile_path = folder / "profile.jpg"
         if profile_path.exists():
             return FileResponse(profile_path)
             
-        images = list(folder.glob("*.jpg")) + list(folder.glob("*.png"))
-        if images:
-            return FileResponse(images[0])
     raise HTTPException(status_code=404, detail="Foto no encontrada")
 
 class PhotoUpload(BaseModel):
@@ -672,22 +711,22 @@ def upload_student_photo(student_id: int, payload: PhotoUpload, session_token: s
     if sess["role"] != "student" or sess["student_id"] != student_id:
         raise HTTPException(status_code=403, detail="Acceso denegado")
         
-    folder = DATASET_DIR / str(student_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    profile_path = folder / "profile.jpg"
-    
-    if profile_path.exists():
+    con = db()
+    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (student_id,))
+    row = cur.fetchone()
+    if row and row["photo_base64"]:
+        con.close()
         raise HTTPException(status_code=403, detail="La foto oficial ya fue subida y no puede cambiarse.")
         
     try:
         header, encoded = payload.image_b64.split(",", 1)
-        img_data = base64.b64decode(encoded)
-        with open(profile_path, "wb") as f:
-            f.write(img_data)
-        return {"ok": True}
+        con.execute("UPDATE students SET photo_base64=%s WHERE id=%s", (encoded, student_id))
+        con.commit()
     except Exception as e:
+        con.close()
         raise HTTPException(status_code=400, detail="Error procesando la imagen")
-
+    con.close()
+    return {"ok": True}
 
 @api_router.post("/student/update-photo")
 async def update_student_photo(session_token: str = Header(...), file: UploadFile = File(...)):
@@ -696,21 +735,23 @@ async def update_student_photo(session_token: str = Header(...), file: UploadFil
         raise HTTPException(status_code=403, detail="Acceso denegado")
 
     sid = sess["student_id"]
-    folder = DATASET_DIR / str(sid)
-    folder.mkdir(parents=True, exist_ok=True)
-    profile_path = folder / "profile.jpg"
-
-    if profile_path.exists():
+    con = db()
+    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (sid,))
+    row = cur.fetchone()
+    if row and row["photo_base64"]:
+        con.close()
         raise HTTPException(status_code=403, detail="La foto de credencial ya fue actualizada. Solo se permite una vez.")
 
     try:
         raw = await file.read()
-        with open(profile_path, "wb") as f:
-            f.write(raw)
+        b64 = base64.b64encode(raw).decode('utf-8')
+        con.execute("UPDATE students SET photo_base64=%s WHERE id=%s", (b64, sid))
+        con.commit()
+        con.close()
         return {"ok": True, "message": "Foto de credencial actualizada correctamente."}
     except Exception:
+        con.close()
         raise HTTPException(status_code=400, detail="Error al guardar la foto.")
-
 
 @api_router.delete("/admin/student/{student_id}/photo")
 def delete_student_photo(student_id: int, session_token: str = Header(...)):
@@ -718,16 +759,19 @@ def delete_student_photo(student_id: int, session_token: str = Header(...)):
     if sess["role"] not in ["admin", "maestro"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
         
+    con = db()
+    con.execute("UPDATE students SET photo_base64=NULL WHERE id=%s", (student_id,))
+    con.commit()
+    con.close()
+    
     profile_path = DATASET_DIR / str(student_id) / "profile.jpg"
     if profile_path.exists():
         try:
             profile_path.unlink()
-            return {"ok": True, "message": "Foto oficial eliminada correctamente. El alumno puede volver a subirla."}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail="No se pudo eliminar el archivo.")
+        except:
+            pass
             
-    return {"ok": True, "message": "El alumno no tenía foto oficial personalizada subida."}
-
+    return {"ok": True, "message": "Foto oficial eliminada correctamente. El alumno puede volver a subirla."}
 
 @api_router.get("/admin/students")
 def get_all_students_admin(session_token: str = Header(...)):
