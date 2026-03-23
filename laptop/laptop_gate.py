@@ -963,8 +963,17 @@ def main():
             show_points = not show_points
 
         if k in (ord("t"), ord("T")):
-            recognizer = train_lbph()
+            # Primero sincronizar modelo y labels desde el servidor
+            sync_cloud_models()
+            # Recargar el modelo LBPH actualizado
+            recognizer = load_lbph_if_exists()
             labels = load_labels()
+            vote_buffer.clear()
+            last_name = "DESCONOCIDO"
+            last_conf = None
+            unknown_streak = 0
+            toast_msg = "SYNC OK" if recognizer else "SIN MODELO"
+            toast_until = nowt + 2.0
 
         if k in (ord("r"), ord("R")) and mode == "gate":
             reg_buffer = ""
