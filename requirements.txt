@@ -1,9 +1,10 @@
 fastapi
 uvicorn[standard]
-opencv-python-headless
+opencv-contrib-python-headless
 numpy
 requests
 google-auth
 pydantic
 python-multipart
 psycopg2-binary
+mediapipe
