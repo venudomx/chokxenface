@@ -521,9 +521,9 @@ async function fetchGoogleBooks(query) {
         if (!data.items || data.items.length === 0) {
             // Fallback en caso de cuota excedida o sin resultados
             data.items = [
-                { volumeInfo: { title: "Clean Code", authors: ["Robert C. Martin"], pageCount: 464, publishedDate: "2008", imageLinks: { thumbnail: "https://books.google.com/books/content?id=dwjwAQAACAAJ&printsec=frontcover&img=1&zoom=1" }, previewLink: "https://books.google.com.mx/books?id=dwjwAQAACAAJ" } },
-                { volumeInfo: { title: "Python Crash Course", authors: ["Eric Matthes"], pageCount: 544, publishedDate: "2019", imageLinks: { thumbnail: "https://books.google.com/books/content?id=1S2LDwAAQBAJ&printsec=frontcover&img=1&zoom=1" }, previewLink: "https://books.google.com.mx/books?id=1S2LDwAAQBAJ" } },
-                { volumeInfo: { title: "Design Patterns", authors: ["Erich Gamma"], pageCount: 416, publishedDate: "1994", imageLinks: { thumbnail: "https://books.google.com/books/content?id=6ohuOUCG7VWC&printsec=frontcover&img=1&zoom=1" }, previewLink: "https://books.google.com.mx/books?id=6ohuOUCG7VWC" } }
+                { volumeInfo: { title: "Clean Code", authors: ["Robert C. Martin"], pageCount: 464, publishedDate: "2008", imageLinks: { thumbnail: "https://covers.openlibrary.org/b/isbn/9780132350884-M.jpg" }, previewLink: "https://openlibrary.org/works/OL10034255W" } },
+                { volumeInfo: { title: "Python Crash Course", authors: ["Eric Matthes"], pageCount: 544, publishedDate: "2019", imageLinks: { thumbnail: "https://covers.openlibrary.org/b/isbn/9781593279288-M.jpg" }, previewLink: "https://openlibrary.org/works/OL19853685W" } },
+                { volumeInfo: { title: "Design Patterns", authors: ["Erich Gamma"], pageCount: 416, publishedDate: "1994", imageLinks: { thumbnail: "https://covers.openlibrary.org/b/isbn/9780201633610-M.jpg" }, previewLink: "https://openlibrary.org/works/OL2848983W" } }
             ];
         }
 

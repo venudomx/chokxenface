@@ -988,46 +988,7 @@ def delete_student_master(student_id: int, session_token: str = Header(...)):
         
     return {"ok": True, "msg": "Usuario y registros faciales eliminados permanentemente"}
 
-@api_router.get("/admin/student/{student_id}/photo")
-def get_student_photo(student_id: int):
-    folder = DATASET_DIR / str(student_id)
-    if not folder.exists():
-        raise HTTPException(status_code=404, detail="No dataset found for this user")
-    
-    import glob
-    files = glob.glob(str(folder / "*_credencial.jpg"))
-    if not files:
-        files = glob.glob(str(folder / "*.jpg"))
-    if not files:
-        raise HTTPException(status_code=404, detail="No photos found for this user")
-    return FileResponse(files[0])
 
-@api_router.post("/admin/student/{student_id}/photo")
-async def upload_student_credential_photo(
-    student_id: int,
-    file: UploadFile = File(...),
-    session_token: str = Header(...)
-):
-    # Validate session (student or admin can upload)
-    sess = get_session(session_token)
-    role = sess.get("role", "")
-    if role not in ("student", "admin", "maestro"):
-        raise HTTPException(status_code=403, detail="Acceso denegado")
-    
-    # Students can only upload their own photo
-    if role == "student" and sess.get("student_id") != student_id:
-        raise HTTPException(status_code=403, detail="No puedes subir la foto de otro alumno")
-    
-    folder = DATASET_DIR / str(student_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    
-    # Save as credencial.jpg (overwrites previous credential photo)
-    save_path = folder / "credencial.jpg"
-    content = await file.read()
-    with open(str(save_path), "wb") as f:
-        f.write(content)
-    
-    return {"ok": True, "msg": "Foto de credencial guardada correctamente"}
 
 # ==================== FORO / CHAT GLOBAL ====================
 
