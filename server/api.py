@@ -724,7 +724,7 @@ def student_dashboard(session_token: str = Header(...)):
     student_info = labels.get("students", {}).get(str(sid), {})
 
     con_db = db()
-    cur_db = con_db.execute("SELECT photo_base64 FROM students WHERE id=%s", (sid,))
+    cur_db = con_db.execute("SELECT photo_base64 FROM students WHERE id=?", (sid,))
     row_db = cur_db.fetchone()
     con_db.close()
     
@@ -757,14 +757,25 @@ def generate_google_pass(student_id: int):
 @api_router.get("/admin/student/{student_id}/photo")
 def get_student_photo(student_id: int):
     con = db()
-    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (student_id,))
+    # Primero intentar foto de perfil
+    cur = con.execute("SELECT photo_base64 FROM students WHERE id=?", (student_id,))
     row = cur.fetchone()
-    con.close()
     if row and row["photo_base64"]:
         import io
         from fastapi.responses import StreamingResponse
         img_data = base64.b64decode(row["photo_base64"])
+        con.close()
         return StreamingResponse(io.BytesIO(img_data), media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
+    
+    # Fallback: usar la primera cara registrada de face_images
+    cur2 = con.execute("SELECT image_base64 FROM face_images WHERE student_id=? LIMIT 1", (student_id,))
+    row2 = cur2.fetchone()
+    con.close()
+    if row2 and row2["image_base64"]:
+        import io
+        from fastapi.responses import StreamingResponse
+        img_data = base64.b64decode(row2["image_base64"])
+        return StreamingResponse(io.BytesIO(img_data), media_type="image/png", headers={"Cache-Control": "max-age=3600"})
         
     folder = DATASET_DIR / str(student_id)
     if folder.exists() and folder.is_dir():
@@ -820,7 +831,7 @@ def delete_student_photo(student_id: int, session_token: str = Header(...)):
         raise HTTPException(status_code=403, detail="Acceso denegado")
         
     con = db()
-    con.execute("UPDATE students SET photo_base64=NULL WHERE id=%s", (student_id,))
+    con.execute("UPDATE students SET photo_base64=NULL WHERE id=?", (student_id,))
     con.commit()
     con.close()
     
