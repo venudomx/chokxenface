@@ -1,0 +1,26 @@
+{
+  "next_id": 5,
+  "students": {
+    "1": {
+      "matricula": "21301",
+      "nombre": "Jose Angel Luna Herrera",
+      "carrera": "Tecnologías de la Información",
+      "email": "jluna21301@plataforma-utslp.net",
+      "updated_at": "2026-03-20 11:49:03"
+    },
+    "2": {
+      "matricula": "177606",
+      "nombre": "Alejandra Sánchez Ortiz",
+      "carrera": "Ingeniería en Mantenimiento Industrial",
+      "email": "alejandraszor@gmail.com",
+      "updated_at": "2026-03-20 21:59:55"
+    },
+    "4": {
+      "matricula": "21674",
+      "nombre": "Sergio Angel Juarez Zarate",
+      "carrera": "Tecnologías de la Información",
+      "email": "sjuarez21674@plataforma-utslp.net",
+      "updated_at": "2026-03-21 13:45:31"
+    }
+  }
+}
