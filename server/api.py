@@ -119,6 +119,14 @@ def db():
         )
         """
     )
+    try:
+        con.execute("ALTER TABLE students ADD COLUMN photo_base64 TEXT")
+    except Exception:
+        pass
+    try:
+        con.execute("ALTER TABLE students ADD COLUMN genero TEXT DEFAULT 'O'")
+    except Exception:
+        pass
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS events (
@@ -198,7 +206,7 @@ def db():
 def load_labels() -> Dict[str, Any]:
     try:
         con_db = db()
-        cur_db = con_db.execute("SELECT id, matricula, nombre, carrera, email FROM students")
+        cur_db = con_db.execute("SELECT id, matricula, nombre, carrera, email, genero FROM students")
         rows = cur_db.fetchall()
         con_db.close()
         
@@ -212,7 +220,8 @@ def load_labels() -> Dict[str, Any]:
                 "matricula": r["matricula"],
                 "nombre": r["nombre"],
                 "carrera": r["carrera"],
-                "email": r["email"]
+                "email": r["email"],
+                "genero": r["genero"] if "genero" in r.keys() else "O"
             }
         labels["next_id"] = max_id
         
@@ -241,11 +250,12 @@ def find_student_id_by_matricula(labels: Dict[str, Any], matricula: str) -> Opti
     return None
 
 
-def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera: str, email: str) -> int:
+def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera: str, email: str, genero: str = "O") -> int:
     matricula = matricula.strip()
     nombre = nombre.strip()
     carrera = carrera.strip()
     email = email.strip()
+    genero = genero.strip() if genero else "O"
 
     sid = find_student_id_by_matricula(labels, matricula)
     if sid is None:
@@ -257,6 +267,7 @@ def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera:
         "nombre": nombre,
         "carrera": carrera,
         "email": email,
+        "genero": genero,
         "updated_at": now_str(),
     }
     save_labels(labels)
@@ -264,14 +275,15 @@ def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera:
     con = db()
     con.execute(
         """
-        INSERT INTO students (id, matricula, nombre, carrera, email, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO students (id, matricula, nombre, carrera, email, created_at, genero)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(matricula) DO UPDATE SET
             nombre=excluded.nombre,
             carrera=excluded.carrera,
-            email=excluded.email
+            email=excluded.email,
+            genero=excluded.genero
         """,
-        (sid, matricula, nombre, carrera, email, now_str()),
+        (sid, matricula, nombre, carrera, email, now_str(), genero),
     )
     con.commit()
     con.close()
@@ -433,6 +445,7 @@ async def register(
     matricula: str = Form(...),
     carrera: str = Form(...),
     nombre: str = Form(""),
+    genero: str = Form("O"),
     files: List[UploadFile] = File(...),
     authorization: Optional[str] = Header(default=None),
 ):
@@ -451,7 +464,7 @@ async def register(
         raise HTTPException(status_code=400, detail="Falta nombre")
 
     labels = load_labels()
-    sid = upsert_student(labels, matricula, nombre_final, carrera, email)
+    sid = upsert_student(labels, matricula, nombre_final, carrera, email, genero)
 
     out_dir = DATASET_DIR / str(sid)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1134,6 +1147,9 @@ def trivia_today(session_token: str = Header(...)):
         questions = _TRIVIA_BANK.get("general", [])
 
     # Seleccionar pregunta del dia
+    if not questions:
+        return {"ok": False, "msg": "No hay trivia configurada para hoy.", "total_points": total_points}
+        
     day_of_year = datetime.now().timetuple().tm_yday
     idx = day_of_year % len(questions)
     q = questions[idx]
@@ -1166,6 +1182,9 @@ def trivia_answer(session_token: str = Header(...), answer: int = Form(...), day
     questions = _TRIVIA_BANK.get(carrera, _TRIVIA_BANK.get("general", []))
     if not questions:
         questions = _TRIVIA_BANK.get("general", [])
+    if not questions:
+        con.close()
+        raise HTTPException(status_code=404, detail="No hay trivia configurada")
 
     idx = day_index % len(questions)
     q = questions[idx]

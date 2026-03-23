@@ -336,6 +336,7 @@ async function submitRegistration() {
     fd.append("nombre", $("reg-nombre").value.trim());
     fd.append("matricula", $("reg-matricula").value.trim());
     fd.append("carrera", $("reg-carrera").value.trim());
+    fd.append("genero", $("reg-genero") ? $("reg-genero").value.trim() : "O");
 
     capturedBlobs.forEach((blob, i) => {
         fd.append("files", blob, `foto_${i}.jpg`);

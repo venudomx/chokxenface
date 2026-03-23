@@ -105,6 +105,28 @@ def speak_async(text_to_speak):
 def ensure_dirs():
     os.makedirs(DATASET_DIR, exist_ok=True)
 
+import requests
+
+def sync_cloud_models():
+    print("Sincronizando biometricos con la nube (Render)...")
+    try:
+        r_labels = requests.get("https://chokxenface.onrender.com/api/model/labels", timeout=10)
+        if r_labels.status_code == 200:
+            with open(LABELS_FILE, "wb") as f:
+                f.write(r_labels.content)
+            print("labels.json actualizado desde la nube.")
+        
+        r_model = requests.get("https://chokxenface.onrender.com/api/model/lbph", timeout=15)
+        if r_model.status_code == 200:
+            with open(LBPH_FILE, "wb") as f:
+                f.write(r_model.content)
+            print("lbph_model.yml actualizado desde la nube.")
+        else:
+            if os.path.exists(LBPH_FILE):
+                os.remove(LBPH_FILE) # Si la nube no tiene modelo, borramos el local para no detectar gente fantasma
+    except Exception as e:
+        print("Aviso: No se pudo sincronizar con la nube (verifique su internet).", e)
+
 def write_log(name, event_type, extras=""):
     header_needed = not os.path.exists(LOG_FILE)
     line = f"{now_str()},{name},{event_type},{extras}\n"
@@ -370,18 +392,29 @@ def train_lbph():
 # ============================
 # UI helpers
 # ============================
-def panel(frame, x, y, w, h, alpha=0.55, border=(90, 90, 90)):
+def panel(frame, x, y, w, h, alpha=0.65, border=(200, 200, 200), bg=(25, 25, 25)):
     overlay = frame.copy()
-    cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 0), -1)
+    cv2.rectangle(overlay, (x, y), (x + w, y + h), bg, -1)
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-    cv2.rectangle(frame, (x, y), (x + w, y + h), border, 2)
+    if border:
+        cv2.rectangle(frame, (x, y), (x + w, y + h), border, 1)
 
-def text(frame, s, x, y, color=(255, 255, 255), scale=0.54, thick=2):
+def text(frame, s, x, y, color=(255, 255, 255), scale=0.52, thick=1):
+    cv2.putText(frame, s, (x+1, y+1), cv2.FONT_HERSHEY_SIMPLEX, scale, (15, 15, 15), thick, cv2.LINE_AA)
     cv2.putText(frame, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
 
-def draw_box(frame, box, color=(0, 255, 0), thick=2):
+def draw_box(frame, box, color=(0, 255, 120), thick=2):
     x1, y1, x2, y2 = box
-    cv2.rectangle(frame, (x1, y1), (x2, y2), color, thick)
+    l = int(min(x2-x1, y2-y1) * 0.2)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
+    cv2.line(frame, (x1, y1), (x1+l, y1), color, thick)
+    cv2.line(frame, (x1, y1), (x1, y1+l), color, thick)
+    cv2.line(frame, (x2, y1), (x2-l, y1), color, thick)
+    cv2.line(frame, (x2, y1), (x2, y1+l), color, thick)
+    cv2.line(frame, (x1, y2), (x1+l, y2), color, thick)
+    cv2.line(frame, (x1, y2), (x1, y2-l), color, thick)
+    cv2.line(frame, (x2, y2), (x2-l, y2), color, thick)
+    cv2.line(frame, (x2, y2), (x2, y2-l), color, thick)
 
 def play_wav_if_exists(path):
     try:
@@ -397,6 +430,7 @@ def play_wav_if_exists(path):
 # Main
 # ============================
 def main():
+    sync_cloud_models()
     os.makedirs(DATASET_DIR, exist_ok=True)
     labels = load_labels()
     recognizer = load_lbph_if_exists()
@@ -581,11 +615,16 @@ def main():
                     # Todos los frames deben coincidir en el mismo ID
                     if len(set(ids_in_buf)) == 1 and max(confs_in_buf) <= LBPH_FLOOR:
                         info = labels.get("students", {}).get(str(lid), {})
-                        nm = info.get("nombre", f"ID_{lid}")
-                        last_name = nm
-                        last_conf = float(np.mean(confs_in_buf))
-                        last_recog_ts = nowt
-                        unknown_streak = 0
+                        if not info:
+                            # ID fantasma: existe en el modelo pero no en labels
+                            vote_buffer.clear()
+                            unknown_streak += 1
+                        else:
+                            nm = info.get("nombre", f"ID_{lid}")
+                            last_name = nm
+                            last_conf = float(np.mean(confs_in_buf))
+                            last_recog_ts = nowt
+                            unknown_streak = 0
                     else:
                         # IDs mezclados = persona no confiable
                         vote_buffer.clear()
@@ -613,7 +652,7 @@ def main():
         # DIBUJO
         # ============================
         import requests
-        API_URL = "http://127.0.0.1:8000/api/events"
+        API_URL = "https://chokxenface.onrender.com/api/events"
         
         # mesh puntos (ligero)
         if last_pts is not None and mesh_mode != 0 and show_points:
@@ -640,16 +679,19 @@ def main():
                 text(small, f"{first}", tag_x + 10, tag_y + 17, (255, 255, 255), FONT_SMALL, 2)
 
         # HUD MINI EN TOP-LEFT
-        panel(small, 10, 10, 190, 80, alpha=0.55)
-        text(small, f"Cam: {cam_idx} | M: {mode}", 18, 25, (255, 255, 255), FONT_SMALL, 1)
-        text(small, f"Liveness: {'OK' if liveness_ok_display else 'OFF'}", 18, 45, (0, 255, 0) if liveness_ok_display else (0, 0, 255), FONT_SMALL, 1)
-        text(small, f"Ev: {event_type} | G: {glasses_pct}%", 18, 65, (255, 255, 0), FONT_SMALL, 1)
+        # HUD MINI EN TOP-LEFT
+        panel(small, 10, 10, 200, 95, alpha=0.55)
+        text(small, f"Cam: {cam_idx} | M: {mode}", 18, 28, (255, 255, 255), 0.50, 1)
+        text(small, f"Liveness: {'OK' if liveness_ok_display else 'OFF'}", 18, 48, (0, 255, 0) if liveness_ok_display else (0, 0, 255), 0.50, 1)
+        text(small, f"Ev: {event_type} | G: {glasses_pct}%", 18, 68, (255, 255, 0), 0.50, 1)
         
         if last_conf is not None:
-             text(small, f"Conf: {last_conf:.1f}", 18, 85, (200, 200, 200), FONT_SMALL, 1)
+             text(small, f"Conf: {last_conf:.1f}", 18, 88, (200, 200, 200), 0.50, 1)
 
         # Liveness & Accesorios Módulo Estricto
-        if glasses_warn or hat_warn:
+        # Gorra: siempre bloquea
+        # Lentes: solo bloquea si los detecta; si no trae, pasa automáticamente
+        if hat_warn or glasses_warn:
             liveness_ok_display = False
             liveness_ok_until = 0.0
 
@@ -696,35 +738,75 @@ def main():
                         pass
                     first = last_name.split(" ")[0].strip()
                     
+                    # Obtener género del alumno
+                    match_info = {}
+                    for k, v in labels_data.items():
+                        if v.get("nombre") == last_name:
+                            match_info = v
+                            break
+                    genero = match_info.get("genero", "O")
+                    
                     if event_type == "entrada":
-                        frases = [
-                            f"Bienvenido {first}.",
-                            f"Hola {first}, te ves increíble hoy.",
-                            f"Qué guapo vienes hoy {first}.",
-                            f"Qué guapa vienes hoy {first}.",
-                            f"¿A dónde vas tan temprano {first}?",
-                            f"Hola {first}, no huyas de la uni tan temprano.",
-                            f"Qué milagro que llegas {first}.",
-                            f"Pase usted {first}, qué elegancia la de Francia.",
-                            f"¡Wow {first}! Estás rompiendo corazones hoy.",
-                            f"Hola {first}, la uni brilla más desde que llegaste.",
-                            f"Esa sonrisa ilumina el campus {first}.",
-                            f"¡Cuidado! {first} acaba de llegar y viene con todo.",
-                            f"Hola {first}, qué buen outfit traes hoy.",
-                            f"Adelante {first}, a conquistar el semestre.",
-                            f"¡Qué porte, {first}! Directo al cuadro de honor.",
-                            f"Hola {first}. Recuerda entregar tus tareas hoy.",
-                            f"Pásale {first}, puro diez el día de hoy.",
-                            f"Con esa actitud, {first}, vas a sacar puro cien.",
-                            f"Bienvenido {first}, futuro orgullo de la universidad.",
-                            f"¡Epa {first}! ¿A quién te vas a ligar hoy?",
-                            f"Qué bien hueles {first}, pase usted.",
-                            f"Hola {first}, espero que hayas desayunado bien.",
-                            f"¡Fiu fiu! Qué belleza acaba de entrar, hola {first}.",
-                            f"Puro VIP hoy, ¿verdad {first}?",
-                            f"Adelante {first}, no olvides tomar agüita.",
-                            f"Hola {first}, hoy te veo con cara de que vas a triunfar."
-                        ]
+                        if genero == "F":
+                            frases = [
+                                f"Bienvenida {first}.",
+                                f"Hola {first}, te ves hermosa hoy.",
+                                f"Qué guapa vienes hoy {first}.",
+                                f"Hola {first}, la uni brilla más desde que llegaste.",
+                                f"Esa sonrisa ilumina el campus {first}.",
+                                f"¡Cuidado! {first} acaba de llegar y viene con todo.",
+                                f"Hola {first}, qué bonita te ves hoy.",
+                                f"Adelante {first}, a conquistar el semestre.",
+                                f"¡Qué elegancia, {first}! Directo al cuadro de honor.",
+                                f"Pásale {first}, puro diez el día de hoy.",
+                                f"Con esa actitud, {first}, vas a sacar puro cien.",
+                                f"Bienvenida {first}, futura orgullo de la universidad.",
+                                f"Hola {first}, qué bonito outfit traes hoy.",
+                                f"Puro VIP hoy, ¿verdad {first}?",
+                                f"Adelante {first}, no olvides tomar agüita.",
+                                f"Hola {first}, hoy te veo con cara de que vas a triunfar.",
+                                f"¡Wow {first}! Estás rompiendo corazones hoy.",
+                                f"Hola {first}, espero que hayas desayunado bien.",
+                                f"¡Fiu fiu! Qué belleza acaba de entrar, hola {first}.",
+                                f"Pase usted {first}, qué elegancia la de Francia."
+                            ]
+                        elif genero == "M":
+                            frases = [
+                                f"Bienvenido {first}.",
+                                f"Hola {first}, te ves increíble hoy.",
+                                f"Qué guapo vienes hoy {first}.",
+                                f"¿A dónde vas tan temprano {first}?",
+                                f"Hola {first}, no huyas de la uni tan temprano.",
+                                f"Qué milagro que llegas {first}.",
+                                f"Pase usted {first}, qué elegancia la de Francia.",
+                                f"¡Wow {first}! Estás rompiendo corazones hoy.",
+                                f"Hola {first}, la uni brilla más desde que llegaste.",
+                                f"¡Cuidado! {first} acaba de llegar y viene con todo.",
+                                f"Hola {first}, qué buen outfit traes hoy.",
+                                f"Adelante {first}, a conquistar el semestre.",
+                                f"¡Qué porte, {first}! Directo al cuadro de honor.",
+                                f"Hola {first}. Recuerda entregar tus tareas hoy.",
+                                f"Pásale {first}, puro diez el día de hoy.",
+                                f"Con esa actitud, {first}, vas a sacar puro cien.",
+                                f"Bienvenido {first}, futuro orgullo de la universidad.",
+                                f"¡Epa {first}! ¿A quién te vas a ligar hoy?",
+                                f"Qué bien hueles {first}, pase usted.",
+                                f"Hola {first}, espero que hayas desayunado bien.",
+                                f"Puro VIP hoy, ¿verdad {first}?",
+                                f"Adelante {first}, no olvides tomar agüita.",
+                                f"Hola {first}, hoy te veo con cara de que vas a triunfar."
+                            ]
+                        else:
+                            frases = [
+                                f"Bienvenido {first}.",
+                                f"Hola {first}, te ves increíble hoy.",
+                                f"Hola {first}, la uni brilla más desde que llegaste.",
+                                f"Adelante {first}, a conquistar el semestre.",
+                                f"Pásale {first}, puro diez el día de hoy.",
+                                f"Hola {first}, espero que hayas desayunado bien.",
+                                f"Puro VIP hoy, ¿verdad {first}?",
+                                f"Hola {first}, hoy te veo con cara de que vas a triunfar."
+                            ]
                     else:
                         frases = [
                             f"Hasta luego {first}.",
@@ -824,13 +906,14 @@ def main():
             text(small, toast_msg, PROC_W - 198, 94, (255, 255, 255), FONT_MAIN, 2)
 
         # reloj en tiempo real
+        # reloj en tiempo real
         now_dt = datetime.now()
         fecha_str = now_dt.strftime("%d/%m/%Y")
         hora_str = now_dt.strftime("%H:%M:%S")
 
-        panel(small, 10, 10, 140, 45, alpha=0.60, border=(255,255,255))
-        text(small, hora_str, 20, 30, (255, 255, 255), FONT_TITLE, 2)
-        text(small, fecha_str, 20, 48, (200, 200, 200), FONT_MAIN, 2)
+        panel(small, 10, 115, 140, 45, alpha=0.60, border=(255,255,255))
+        text(small, hora_str, 20, 135, (255, 255, 255), FONT_TITLE, 2)
+        text(small, fecha_str, 20, 153, (200, 200, 200), FONT_MAIN, 2)
 
         # mostrar
         display = cv2.resize(small, (CAP_W, CAP_H), interpolation=cv2.INTER_LINEAR)
