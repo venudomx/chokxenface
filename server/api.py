@@ -85,6 +85,19 @@ class PostgresWrapper:
         cur.execute(query, params)
         return cur
         
+    def cursor(self):
+        class CursorWrapper:
+            def __init__(self, cur):
+                self.cur = cur
+            def execute(self, query, params=()):
+                query = query.replace('?', '%s')
+                self.cur.execute(query, params)
+                return self
+            def fetchone(self): return self.cur.fetchone()
+            def fetchall(self): return self.cur.fetchall()
+            def fetchmany(self, size=None): return self.cur.fetchmany(size)
+        return CursorWrapper(self.con.cursor())
+        
     def commit(self):
         self.con.commit()
         
@@ -170,14 +183,49 @@ def db():
         )
         """
     )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS face_images (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER,
+            image_base64 TEXT
+        )
+        """
+    )
     return con
 
 
 def load_labels() -> Dict[str, Any]:
-    if LABELS_FILE.exists():
-        with open(LABELS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"next_id": 0, "students": {}}
+    try:
+        con_db = db()
+        cur_db = con_db.execute("SELECT id, matricula, nombre, carrera, email FROM students")
+        rows = cur_db.fetchall()
+        con_db.close()
+        
+        labels = {"next_id": 0, "students": {}}
+        max_id = 0
+        for r in rows:
+            sid = r["id"]
+            if sid >= max_id:
+                max_id = sid + 1
+            labels["students"][str(sid)] = {
+                "matricula": r["matricula"],
+                "nombre": r["nombre"],
+                "carrera": r["carrera"],
+                "email": r["email"]
+            }
+        labels["next_id"] = max_id
+        
+        # Guardar en disco para que /model/labels lo pueda servir a la laptop
+        with open(LABELS_FILE, "w", encoding="utf-8") as f:
+            json.dump(labels, f, indent=2, ensure_ascii=False)
+            
+        return labels
+    except Exception as e:
+        if LABELS_FILE.exists():
+            with open(LABELS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {"next_id": 0, "students": {}}
 
 
 def save_labels(labels: Dict[str, Any]) -> None:
@@ -320,16 +368,18 @@ def train_lbph() -> Dict[str, Any]:
     imgs: List[np.ndarray] = []
     y: List[int] = []
 
-    for sid_str in labels.get("students", {}).keys():
-        sid = int(sid_str)
-        folder = DATASET_DIR / str(sid)
-        if not folder.exists():
-            continue
-
-        for fn in folder.glob("*.png"):
-            img = cv2.imread(str(fn), cv2.IMREAD_GRAYSCALE)
-            if img is None:
-                continue
+    con = db()
+    cur = con.execute("SELECT student_id, image_base64 FROM face_images")
+    rows = cur.fetchall()
+    con.close()
+    
+    for r in rows:
+        sid = r["student_id"]
+        img_data = base64.b64decode(r["image_base64"])
+        arr = np.frombuffer(img_data, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+        if img is not None:
+            # Asegurar tamaño LBPH
             img = cv2.resize(img, FACE_SIZE)
             imgs.append(img)
             y.append(sid)
@@ -425,6 +475,15 @@ async def register(
 
             out_path = out_dir / f"{int(time.time()*1000)}_{saved}.png"
             cv2.imwrite(str(out_path), face)
+            
+            # Guardar tambien en PostgreSQL para persistencia
+            _, buffer = cv2.imencode('.png', face)
+            b64_face = base64.b64encode(buffer).decode('utf-8')
+            con = db()
+            con.execute("INSERT INTO face_images (student_id, image_base64) VALUES (%s, %s)", (sid, b64_face))
+            con.commit()
+            con.close()
+            
             saved += 1
         except Exception:
             skipped += 1
@@ -1167,3 +1226,15 @@ def trivia_answer(session_token: str = Header(...), answer: int = Form(...), day
         "points_earned": points,
         "total_points": total_points
     }
+
+@api_router.on_event("startup")
+async def on_startup():
+    import threading
+    def background_train():
+        try:
+            print("Entrenando LBPH desde PostgreSQL en segundo plano...")
+            train_lbph()
+            print("Entrenamiento finalizado.")
+        except Exception as e:
+            print("Error auto-entrenando:", e)
+    threading.Thread(target=background_train, daemon=True).start()
