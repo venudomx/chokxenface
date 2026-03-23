@@ -37,11 +37,11 @@ FACE_SIZE = (200, 200)
 # ============================
 # Liveness
 # ============================
-BLINK_EAR_THRESH = 0.19
-BLINK_COOLDOWN_SEC = 0.25
+BLINK_EAR_THRESH = 0.22  # Subido para detectar parpadeos más ligeros/rápidos
+BLINK_COOLDOWN_SEC = 0.20 # Enfriamiento más rápido
 LIVENESS_WINDOW_SEC = 6.0
-BLINKS_REQUIRED = 2
-LIVENESS_HOLD_SEC = 2.0  # evita parpadeo ON/OFF
+BLINKS_REQUIRED = 1      # Agilizar entrada: 1 solo parpadeo basta
+LIVENESS_HOLD_SEC = 3.0  # Tiempo que se mantiene vivo tras parpadear
 
 # ============================
 # Avisos (NO bloqueo)
