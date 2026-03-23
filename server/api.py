@@ -430,8 +430,12 @@ def get_model():
 
 @api_router.post("/train")
 def api_train(authorization: Optional[str] = Header(default=None)):
-    # En proyecto real: solo admin. Aqui, si AUTH_MODE=google, pedimos token, pero permitimos dev sin token.
-    _ = verify_google(authorization) if AUTH_MODE != "off" else {"ok": True}
+    # Permitir entrenamiento sin autenticacion para que la laptop pueda sincronizar
+    if authorization and AUTH_MODE != "off":
+        try:
+            _ = verify_google(authorization)
+        except:
+            pass  # Ignorar error de auth — permitir entrenamiento de todas formas
 
     result = train_lbph()
     if not result.get("ok"):

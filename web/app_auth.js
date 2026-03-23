@@ -442,7 +442,7 @@ function showCredentialPhotoStep(studentId, token) {
         fd.append("file", credBlob, "credencial.jpg");
         
         try {
-            const res = await fetch(`/api/admin/student/${credStudentId}/photo`, {
+            const res = await fetch(`/api/student/update-photo`, {
                 method: "POST",
                 headers: { "session-token": credStudentToken },
                 body: fd

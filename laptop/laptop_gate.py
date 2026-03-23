@@ -107,23 +107,42 @@ def ensure_dirs():
 
 import requests
 
+API_BASE = "https://chokxenface.onrender.com/api"
+
 def sync_cloud_models():
     print("Sincronizando biometricos con la nube (Render)...")
     try:
-        r_labels = requests.get("https://chokxenface.onrender.com/api/model/labels", timeout=10)
+        # 1. Descargar labels
+        r_labels = requests.get(f"{API_BASE}/model/labels", timeout=10)
         if r_labels.status_code == 200:
             with open(LABELS_FILE, "wb") as f:
                 f.write(r_labels.content)
             print("labels.json actualizado desde la nube.")
         
-        r_model = requests.get("https://chokxenface.onrender.com/api/model/lbph", timeout=15)
+        # 2. Intentar descargar modelo
+        r_model = requests.get(f"{API_BASE}/model/lbph", timeout=15)
+        
+        if r_model.status_code == 404:
+            # Modelo no existe en servidor — forzar reentrenamiento remoto
+            print("Modelo no encontrado en la nube. Forzando entrenamiento remoto...")
+            try:
+                r_train = requests.post(f"{API_BASE}/train", timeout=60)
+                if r_train.status_code == 200:
+                    print("Entrenamiento remoto exitoso. Descargando modelo...")
+                    r_model = requests.get(f"{API_BASE}/model/lbph", timeout=15)
+                else:
+                    print(f"Error entrenando remotamente: {r_train.status_code} {r_train.text}")
+            except Exception as te:
+                print(f"Error al entrenar remotamente: {te}")
+        
         if r_model.status_code == 200:
             with open(LBPH_FILE, "wb") as f:
                 f.write(r_model.content)
             print("lbph_model.yml actualizado desde la nube.")
         else:
+            print(f"No se pudo obtener el modelo: {r_model.status_code}")
             if os.path.exists(LBPH_FILE):
-                os.remove(LBPH_FILE) # Si la nube no tiene modelo, borramos el local para no detectar gente fantasma
+                os.remove(LBPH_FILE)
     except Exception as e:
         print("Aviso: No se pudo sincronizar con la nube (verifique su internet).", e)
 
