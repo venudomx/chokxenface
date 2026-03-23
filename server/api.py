@@ -493,7 +493,7 @@ async def register(
             _, buffer = cv2.imencode('.png', face)
             b64_face = base64.b64encode(buffer).decode('utf-8')
             con = db()
-            con.execute("INSERT INTO face_images (student_id, image_base64) VALUES (%s, %s)", (sid, b64_face))
+            con.execute("INSERT INTO face_images (student_id, image_base64) VALUES (?, ?)", (sid, b64_face))
             con.commit()
             con.close()
             
@@ -783,21 +783,16 @@ def upload_student_photo(student_id: int, payload: PhotoUpload, session_token: s
     if sess["role"] != "student" or sess["student_id"] != student_id:
         raise HTTPException(status_code=403, detail="Acceso denegado")
         
-    con = db()
-    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (student_id,))
-    row = cur.fetchone()
-    if row and row["photo_base64"]:
-        con.close()
-        raise HTTPException(status_code=403, detail="La foto oficial ya fue subida y no puede cambiarse.")
-        
     try:
-        header, encoded = payload.image_b64.split(",", 1)
-        con.execute("UPDATE students SET photo_base64=%s WHERE id=%s", (encoded, student_id))
+        encoded = payload.image_b64
+        if "," in encoded:
+            header, encoded = encoded.split(",", 1)
+        con = db()
+        con.execute("UPDATE students SET photo_base64=? WHERE id=?", (encoded, student_id))
         con.commit()
-    except Exception as e:
         con.close()
+    except Exception as e:
         raise HTTPException(status_code=400, detail="Error procesando la imagen")
-    con.close()
     return {"ok": True}
 
 @api_router.post("/student/update-photo")
@@ -807,22 +802,15 @@ async def update_student_photo(session_token: str = Header(...), file: UploadFil
         raise HTTPException(status_code=403, detail="Acceso denegado")
 
     sid = sess["student_id"]
-    con = db()
-    cur = con.execute("SELECT photo_base64 FROM students WHERE id=%s", (sid,))
-    row = cur.fetchone()
-    if row and row["photo_base64"]:
-        con.close()
-        raise HTTPException(status_code=403, detail="La foto de credencial ya fue actualizada. Solo se permite una vez.")
-
     try:
         raw = await file.read()
         b64 = base64.b64encode(raw).decode('utf-8')
-        con.execute("UPDATE students SET photo_base64=%s WHERE id=%s", (b64, sid))
+        con = db()
+        con.execute("UPDATE students SET photo_base64=? WHERE id=?", (b64, sid))
         con.commit()
         con.close()
         return {"ok": True, "message": "Foto de credencial actualizada correctamente."}
     except Exception:
-        con.close()
         raise HTTPException(status_code=400, detail="Error al guardar la foto.")
 
 @api_router.delete("/admin/student/{student_id}/photo")
