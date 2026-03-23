@@ -969,6 +969,8 @@ def delete_student_master(student_id: int, session_token: str = Header(...)):
     con.execute("DELETE FROM students WHERE id=?", (student_id,))
     con.execute("DELETE FROM events WHERE student_id=?", (student_id,))
     con.execute("DELETE FROM absences WHERE student_id=?", (student_id,))
+    con.execute("DELETE FROM face_images WHERE student_id=?", (student_id,))
+    con.execute("DELETE FROM trivia_answers WHERE student_id=?", (student_id,))
     con.commit()
     con.close()
     
