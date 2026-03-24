@@ -7,6 +7,8 @@ import numpy as np
 import random
 from datetime import datetime
 import subprocess
+import threading
+import base64
 
 # ============================
 # Paths (proyecto)
@@ -243,7 +245,7 @@ def rect_from_points(pts, w, h, pad=0.15):
     y2 = clamp(y2, 0, h - 1)
     return x1, y1, x2, y2
 
-def face_rect_from_landmarks(pts, w, h, pad=0.10):
+def face_rect_from_landmarks(pts, w, h, pad=0.22):
     return rect_from_points(pts, w, h, pad=pad)
 
 # ============================
@@ -458,6 +460,8 @@ def main():
         print("No pude abrir camara. Presiona C para cambiar index.")
         return
 
+    qr_decoder = cv2.QRCodeDetector()
+
     face_mesh = mp_face_mesh.FaceMesh(
         static_image_mode=False,
         max_num_faces=1,
@@ -547,6 +551,38 @@ def main():
         # usamos display_liveness estable
         nowt = time.time()
         liveness_ok_display = (nowt <= liveness_ok_until)
+
+        # Inferencia QR (cada 3 frames para no saturar CPU)
+        if frame_i % 3 == 0:
+            qr_data, _, _ = qr_decoder.detectAndDecode(frame)
+            if qr_data and qr_data.startswith("UTSLP-ALUMNO-"):
+                try:
+                    parts = qr_data.split("-")
+                    if len(parts) >= 4:
+                        sid_str = parts[3]
+                        if sid_str in labels.get("students", {}):
+                            s_name = labels["students"][sid_str]
+                            # Otorgar acceso inmediatamente
+                            last_name = s_name
+                            last_conf = 0.0
+                            last_recog_ts = nowt
+                            liveness_ok_until = nowt + LIVENESS_HOLD_SEC
+                            liveness_ok_display = True
+                            toast_until = nowt + 5.0
+                            toast_msg = "QR Aceptado. Auto-Entrenando modelo..."
+                            
+                            # Disparar Auto-Sanacion si hay un rostro en pantalla
+                            if last_face_gray is not None:
+                                def send_qr_heal(student_id, gray_img):
+                                    try:
+                                        _, buffer = cv2.imencode('.jpg', gray_img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+                                        b64 = base64.b64encode(buffer).decode('utf-8')
+                                        requests.post(f"{API_BASE}/train/auto_qr", json={"student_id": int(student_id), "image_b64": b64}, timeout=5)
+                                    except:
+                                        pass
+                                threading.Thread(target=send_qr_heal, args=(sid_str, last_face_gray), daemon=True).start()
+                except:
+                    pass
 
         # inferencia FaceMesh
         if frame_i % INFER_EVERY_N == 0:

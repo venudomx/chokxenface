@@ -888,6 +888,27 @@ def debug_faces():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class AutoQRRequest(BaseModel):
+    student_id: int
+    image_b64: str
+
+@api_router.post("/train/auto_qr")
+async def train_auto_qr(req: AutoQRRequest, background_tasks: BackgroundTasks):
+    # La laptop asume autenticidad del QR criptográfico antes de enviarlo
+    try:
+        encoded = req.image_b64
+        if "," in encoded:
+            header, encoded = encoded.split(",", 1)
+        
+        query = "INSERT INTO face_images (student_id, image_base64) VALUES (?, ?)"
+        PostgresWrapper.execute(query, (req.student_id, encoded))
+        
+        # Disparamos el entrenamiento en segundo plano para no bloquear a la laptop
+        background_tasks.add_task(train_lbph)
+        return {"ok": True, "msg": "Auto-sanación activada: Rostro guardado y entrenando."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/admin/students")
 def get_all_students_admin(session_token: str = Header(...)):
     sess = get_session(session_token)

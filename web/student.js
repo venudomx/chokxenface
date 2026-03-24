@@ -337,9 +337,17 @@ function downloadTicketPDF() {
     doc.text(`Alumno: ${$("st-name").textContent || "Alumno"}`, 20, 70);
     doc.text(`Fecha Misión: ${new Date().toLocaleString()}`, 20, 80);
     
+    const qrCanvas = document.querySelector("#qrcode-container canvas");
     const qrImg = document.querySelector("#qrcode-container img");
-    if (qrImg && qrImg.src) {
-        doc.addImage(qrImg.src, 'PNG', 20, 95, 75, 75);
+    let imgSrc = null;
+    if (qrCanvas) {
+        imgSrc = qrCanvas.toDataURL("image/png");
+    } else if (qrImg && qrImg.src) {
+        imgSrc = qrImg.src;
+    }
+    
+    if (imgSrc) {
+        doc.addImage(imgSrc, 'PNG', 20, 95, 75, 75);
     }
     
     doc.setFontSize(11);
