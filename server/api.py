@@ -1284,3 +1284,18 @@ async def on_startup():
         except Exception as e:
             print("Error auto-entrenando:", e)
     threading.Thread(target=background_train, daemon=True).start()
+@api_router.get("/wallet/apple/{student_id}")
+async def get_apple_pass(student_id: int):
+    # Apple bloquea pases no firmados. Se necesita Certificado de Desarrollador Apple ($99/yr)
+    return JSONResponse({
+        "ok": False,
+        "message": "Función en construcción. La universidad está tramitando el Certificado de Desarrollador de Apple necesario para emitir pases oficiales (.pkpass)."
+    })
+
+@api_router.get("/wallet/google/{student_id}")
+async def get_google_pass(student_id: int):
+    # Google Wallet requiere Google Pay API for Passes Console y una Service Account válida
+    return JSONResponse({
+        "ok": False,
+        "message": "Función en construcción. Se requiere la activación de la API de Google Wallet Cloud (Cuenta de Servicio) por parte del departamento de TI."
+    })

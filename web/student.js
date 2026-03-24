@@ -432,7 +432,41 @@ window.openVirtualID = function() {
     }
 };
 
-// ==================== WAALET BINDINGS ====================
+// ==================== WAALET BINDINGS (Reemplazado x Imagen Nativa) ====================
+window.downloadCredentialImage = async function() {
+    if (typeof html2canvas === 'undefined') {
+        alert("Librería de renderizado aún cargando o bloqueada. Revisa tu conexión a internet.");
+        return;
+    }
+    const cardEl = document.getElementById("virtual-id-front");
+    if (!cardEl) return;
+    
+    const origTransform = cardEl.style.transform;
+    cardEl.style.transform = "none"; // Evita glitch de perspectiva 3D al renderizar
+    
+    try {
+        const canvas = await html2canvas(cardEl, { 
+            scale: window.devicePixelRatio || 2, 
+            useCORS: true, 
+            backgroundColor: null 
+        });
+        
+        cardEl.style.transform = origTransform;
+        
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = `Credencial_UTSLP_${localStorage.getItem("fa_student_id") || "Alumno"}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+    } catch (e) {
+        console.error("Error html2canvas: ", e);
+        alert("Hubo un problema al intentar generar la imagen. Intenta de nuevo.");
+        cardEl.style.transform = origTransform;
+    }
+};
+
 window.downloadApplePass = async function() {
     const studentId = localStorage.getItem("fa_student_id");
     try {

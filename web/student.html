@@ -469,7 +469,7 @@
         <div class="id-card" id="my-id-card" onclick="this.classList.toggle('is-flipped')">
           
           <!-- ========== FRENTE (Replica UTSLP) ========== -->
-          <div class="card-face card-front" style="padding:0; display:flex; flex-direction:column; color:#1a1a1a; background:#f5f5f0; overflow:hidden;">
+          <div id="virtual-id-front" class="card-face card-front" style="padding:0; display:flex; flex-direction:column; color:#1a1a1a; background:#f5f5f0; overflow:hidden;">
             <div class="id-hologram"></div>
             
             <!-- Franjas verdes diagonales superiores -->
@@ -555,17 +555,26 @@
       </div>
       
       <p style="color:#e2e8f0; font-size:13px; margin-top:20px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,0.8);">Toca la credencial para voltearla</p>
+      <!-- Botones de Guardado y Wallets -->
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px; width:100%; max-width:320px;">
+        
+        <!-- Guardar Galería -->
+        <button style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:#10b981; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; box-shadow:0 4px 15px rgba(16,185,129,0.3); transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform=''" onclick="downloadCredentialImage()">
+          <svg style="width:18px; height:18px; fill:#fff;" viewBox="0 0 512 512"><path d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H346.5l-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352H64z"/></svg>
+          Guardar en Galería
+        </button>
 
-      <!-- Botones Wallet -->
-      <div style="display:flex; gap:12px; margin-top:15px; width:100%; max-width:320px;">
-        <button style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:#000; color:#fff; border:1px solid #333; padding:10px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform=''" onclick="downloadApplePass()">
-          <svg style="width:16px; height:16px; fill:#fff;" viewBox="0 0 384 512"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.1-44.6-35.9-2.8-74.3 22.7-93.1 22.7-18.9 0-46.5-20.9-72.1-20.9-44.6 0-83.3 28.1-106.8 69.1-47.4 83.2-11.2 206.5 35.1 273.8 22.6 32.8 52.9 70.8 89.2 69.4 33.6-1.5 46.5-22.7 87.1-22.7 40.5 0 52.4 22.7 87.6 22.1 37.1-.6 64-34.9 85.5-66.9 25.1-37.4 35.5-74.6 36.1-76.5-.8-.3-68.9-26.4-69.5-103.1zm-84.1-213c18.5-22.7 31-54.3 27.6-85.7-27.1 1.1-60.6 18.2-79.6 40.8-16.1 19.1-30.8 51.2-26.8 81.3 30.6 2.4 60.1-13.6 78.8-36.4z"/></svg>
-          Apple Wallet
-        </button>
-        <button style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:#fff; color:#3c4043; border:1px solid #dadce0; padding:10px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform=''" onclick="downloadGooglePass()">
-          <svg style="width:16px; height:16px;" viewBox="0 0 48 48"><path fill="#fbbc05" d="M10.53 28.59l-3.32 10.22A24.004 24.004 0 0 1 2.26 24C2.26 15.34 6.84 7.74 13.56 3.51L24 13.94a11.96 11.96 0 0 0-1.47 14.65z"/><path fill="#ea4335" d="M24 13.94l-10.44-10.43A23.86 23.86 0 0 1 24 0c6.19 0 11.83 2.34 16.08 6.18l-8.49 8.49A11.97 11.97 0 0 0 24 13.94z"/><path fill="#34a853" d="M24 35.8c-3.13 0-6.02-1.2-8.2-3.17L5.58 42.85A23.83 23.83 0 0 0 24 48c5.44 0 10.45-1.81 14.47-4.86l-9.15-8.58A11.95 11.95 0 0 1 24 35.8z"/><path fill="#4285f4" d="M47.53 24.53H24v11.27h13.2a11.94 11.94 0 0 1-7.88 7.64l9.15 8.58c3.2-2.78 5.4-6.31 6.55-10.27A23.95 23.95 0 0 0 48 24c0-.82-.07-1.63-.19-2.43l-8.48 8.48c-1.84-2.82-5.06-4.66-8.7-4.66z"/></svg>
-          Google Wallet
-        </button>
+        <!-- Wallets (Apple & Google) -->
+        <div style="display:flex; gap:12px; width:100%;">
+          <button style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#000; color:#fff; border:1px solid #333; padding:10px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform=''" onclick="downloadApplePass()">
+            <svg style="width:14px; height:14px; fill:#fff;" viewBox="0 0 384 512"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.1-44.6-35.9-2.8-74.3 22.7-93.1 22.7-18.9 0-46.5-20.9-72.1-20.9-44.6 0-83.3 28.1-106.8 69.1-47.4 83.2-11.2 206.5 35.1 273.8 22.6 32.8 52.9 70.8 89.2 69.4 33.6-1.5 46.5-22.7 87.1-22.7 40.5 0 52.4 22.7 87.6 22.1 37.1-.6 64-34.9 85.5-66.9 25.1-37.4 35.5-74.6 36.1-76.5-.8-.3-68.9-26.4-69.5-103.1zm-84.1-213c18.5-22.7 31-54.3 27.6-85.7-27.1 1.1-60.6 18.2-79.6 40.8-16.1 19.1-30.8 51.2-26.8 81.3 30.6 2.4 60.1-13.6 78.8-36.4z"/></svg>
+            Apple Wallet
+          </button>
+          <button style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#fff; color:#3c4043; border:1px solid #dadce0; padding:10px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; transition:transform 0.2s;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform=''" onclick="downloadGooglePass()">
+            <svg style="width:14px; height:14px;" viewBox="0 0 48 48"><path fill="#fbbc05" d="M10.53 28.59l-3.32 10.22A24.004 24.004 0 0 1 2.26 24C2.26 15.34 6.84 7.74 13.56 3.51L24 13.94a11.96 11.96 0 0 0-1.47 14.65z"/><path fill="#ea4335" d="M24 13.94l-10.44-10.43A23.86 23.86 0 0 1 24 0c6.19 0 11.83 2.34 16.08 6.18l-8.49 8.49A11.97 11.97 0 0 0 24 13.94z"/><path fill="#34a853" d="M24 35.8c-3.13 0-6.02-1.2-8.2-3.17L5.58 42.85A23.83 23.83 0 0 0 24 48c5.44 0 10.45-1.81 14.47-4.86l-9.15-8.58A11.95 11.95 0 0 1 24 35.8z"/><path fill="#4285f4" d="M47.53 24.53H24v11.27h13.2a11.94 11.94 0 0 1-7.88 7.64l9.15 8.58c3.2-2.78 5.4-6.31 6.55-10.27A23.95 23.95 0 0 0 48 24c0-.82-.07-1.63-.19-2.43l-8.48 8.48c-1.84-2.82-5.06-4.66-8.7-4.66z"/></svg>
+            Google Wallet
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -620,6 +629,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="student.js?v=9"></script>
   <script src="chatbot.js?v=5"></script>
   <script src="blackhole.js"></script>
