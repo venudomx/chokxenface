@@ -242,14 +242,14 @@ async function startLivenessPhase() {
 
     try {
         const fm = new FaceMesh({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-        fm.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5 });
+        fm.setOptions({ maxNumFaces:1, refineLandmarks:false, minDetectionConfidence:0.4 });
         fm.onResults(onFaceResults);
         faceMeshInstance = fm;
 
         const vid = $("video-reg");
         cameraLoginUtils = new Camera(vid, {
             onFrame: async () => { await fm.send({ image: vid }); },
-            width: 640, height: 480
+            width: 320, height: 240
         });
         cameraLoginUtils.start();
         setInnerStatus("Escaner activo");
@@ -261,9 +261,13 @@ async function startLivenessPhase() {
 // ==================== PASOS 3-5: CAPTURA DIRIGIDA ====================
 async function captureBlob(vid) {
     const c = document.createElement("canvas");
-    c.width = vid.videoWidth || 640; c.height = vid.videoHeight || 480;
-    c.getContext("2d").drawImage(vid, 0, 0);
-    return new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
+    const vw = vid.videoWidth || 640;
+    const vh = vid.videoHeight || 480;
+    const scale = Math.min(1.0, 360 / vw); // Reducir a max 360px de ancho para agilizar
+    c.width = Math.round(vw * scale); 
+    c.height = Math.round(vh * scale);
+    c.getContext("2d").drawImage(vid, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(r, "image/jpeg", 0.70)); // Alta compresión = envío rápido
 }
 
 async function startCapturePhase(phase) {
@@ -429,7 +433,7 @@ function showCredentialPhotoStep(studentId, token) {
             $("cred-preview").style.display = "block";
             $("btn-tomar-foto").style.display = "none";
             $("btn-subir-foto").style.display = "block";
-        }, "image/jpeg", 0.92);
+        }, "image/jpeg", 0.72); // Bajar peso de credencial a calidad 72%
     };
     
     // Upload button

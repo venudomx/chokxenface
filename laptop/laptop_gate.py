@@ -37,11 +37,11 @@ FACE_SIZE = (200, 200)
 # ============================
 # Liveness
 # ============================
-BLINK_EAR_THRESH = 0.22  # Subido para detectar parpadeos más ligeros/rápidos
-BLINK_COOLDOWN_SEC = 0.20 # Enfriamiento más rápido
+BLINK_EAR_THRESH = 0.27  # MUY sensible para detectar parpadeos incluso con reflejos de lentes
+BLINK_COOLDOWN_SEC = 0.20
 LIVENESS_WINDOW_SEC = 6.0
-BLINKS_REQUIRED = 1      # Agilizar entrada: 1 solo parpadeo basta
-LIVENESS_HOLD_SEC = 3.0  # Tiempo que se mantiene vivo tras parpadear
+BLINKS_REQUIRED = 1
+LIVENESS_HOLD_SEC = 3.0
 
 # ============================
 # Avisos (NO bloqueo)
@@ -52,14 +52,13 @@ HAT_WARN_ON = 85
 HAT_WARN_OFF = 65
 
 # ============================
-# LBPH (reconocimiento) — umbrales balanceados
+# LBPH (reconocimiento) — umbrales ESTRICTOS anti falsos positivos
 # ============================
-# LBPH distancia: MENOR = mas parecido a la cara registrada
-# < 50 = match excelente  |  50-65 = match aceptable  |  > 65 = rechazar
-LBPH_STRICT = 58.0   # umbral principal: por debajo = acceso OK
-LBPH_OK     = 65.0   # umbral relajado: muestra nombre sin dar acceso
-LBPH_FLOOR  = 68.0   # rechazo absoluto: distancia mayor siempre = DESCONOCIDO
-LBPH_MIN_SAMPLES = 3  # frames consecutivos requeridos para confirmar
+# LBPH distancia: MENOR = mas parecido. Si da > 60 se asume DESCONOCIDO.
+LBPH_STRICT = 53.0   # umbral principal: por debajo = acceso OK (match muy seguro)
+LBPH_OK     = 57.0   # umbral relajado: muestra nombre sin dar acceso
+LBPH_FLOOR  = 61.0   # rechazo absoluto: distancia mayor = DESCONOCIDO
+LBPH_MIN_SAMPLES = 4  # Más frames consecutivos requeridos para confirmar
 RECOG_HOLD_SEC   = 1.6
 UNKNOWN_AFTER_SEC = 0.9
 UNKNOWN_STRIKES   = 3
