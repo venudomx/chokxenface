@@ -39,7 +39,7 @@ FACE_SIZE = (200, 200)
 # ============================
 # Liveness (Velocidad extrema)
 # ============================
-BLINK_EAR_THRESH = 0.27
+BLINK_EAR_THRESH = 0.30
 BLINK_COOLDOWN_SEC = 0.20
 LIVENESS_WINDOW_SEC = 6.0
 BLINKS_REQUIRED = 1      # 1 = Requiere un parpadeo para probar que es persona
@@ -742,9 +742,8 @@ def main():
              text(small, f"Conf: {last_conf:.1f}", 18, 88, (200, 200, 200), 0.50, 1)
 
         # Liveness & Accesorios Módulo Estricto
-        # Gorra: siempre bloquea
-        # Lentes: solo bloquea si los detecta; si no trae, pasa automáticamente
-        if hat_warn or glasses_warn:
+        # Gorra: siempre bloquea. Lentes: Advierte pero ya NO bloquea (el parpadeo es válido si se detecta)
+        if hat_warn:
             liveness_ok_display = False
             liveness_ok_until = 0.0
 

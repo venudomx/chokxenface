@@ -1036,7 +1036,7 @@ def delete_latest_absence_by_matricula(matricula: str, session_token: str = Head
     return {"ok": True, "deleted": False}
 
 @api_router.delete("/admin/student/{student_id}")
-def delete_student_master(student_id: int, session_token: str = Header(...)):
+def delete_student_master(student_id: int, bg_tasks: BackgroundTasks, session_token: str = Header(...)):
     sess = get_session(session_token)
     if sess["role"] != "admin":
         raise HTTPException(status_code=403, detail="Acceso denegado (Solo Administrador Maestro)")
@@ -1063,8 +1063,10 @@ def delete_student_master(student_id: int, session_token: str = Header(...)):
     if folder.exists():
         shutil.rmtree(folder)
         
-    return {"ok": True, "msg": "Usuario y registros faciales eliminados permanentemente"}
-
+    # Forzar el re-entrenamiento para erradicar pesos espectrales en la red
+    bg_tasks.add_task(train_lbph)
+        
+    return {"ok": True, "msg": "Usuario, reconocimiento y registros faciales eliminados correctamente del modelo global"}
 
 
 # ==================== FORO / CHAT GLOBAL ====================
