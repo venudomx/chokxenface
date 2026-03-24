@@ -35,12 +35,12 @@ ACC_EVERY_N = 3
 FACE_SIZE = (200, 200)
 
 # ============================
-# Liveness
+# Liveness (Velocidad extrema)
 # ============================
-BLINK_EAR_THRESH = 0.27  # MUY sensible para detectar parpadeos incluso con reflejos de lentes
+BLINK_EAR_THRESH = 0.27
 BLINK_COOLDOWN_SEC = 0.20
 LIVENESS_WINDOW_SEC = 6.0
-BLINKS_REQUIRED = 1
+BLINKS_REQUIRED = 1      # 1 = Requiere un parpadeo para probar que es persona
 LIVENESS_HOLD_SEC = 3.0
 
 # ============================
@@ -52,14 +52,13 @@ HAT_WARN_ON = 85
 HAT_WARN_OFF = 65
 
 # ============================
-# LBPH (reconocimiento) — umbrales ESTRICTOS anti falsos positivos
+# LBPH (reconocimiento) — Equilibrado para velocidad y precisión
 # ============================
-# LBPH distancia: MENOR = mas parecido. Si da > 60 se asume DESCONOCIDO.
-LBPH_STRICT = 53.0   # umbral principal: por debajo = acceso OK (match muy seguro)
-LBPH_OK     = 57.0   # umbral relajado: muestra nombre sin dar acceso
-LBPH_FLOOR  = 61.0   # rechazo absoluto: distancia mayor = DESCONOCIDO
-LBPH_MIN_SAMPLES = 4  # Más frames consecutivos requeridos para confirmar
-RECOG_HOLD_SEC   = 1.6
+LBPH_STRICT = 58.0   # umbral para dar acceso (relajado de nuevo)
+LBPH_OK     = 63.0   # muestra nombre
+LBPH_FLOOR  = 66.0   # piso de rechazo
+LBPH_MIN_SAMPLES = 5  # 5 frames CONSECUTIVOS iguales para evitar falsos positivos (como Fabian)
+RECOG_HOLD_SEC   = 3.0  # 3 segundos de pausa en pantalla verde al dar acceso
 UNKNOWN_AFTER_SEC = 0.9
 UNKNOWN_STRIKES   = 3
 
@@ -79,7 +78,7 @@ FONT_SMALL = 0.48
 # ============================
 # Admin menu oculto
 # ============================
-ADMIN_SECRET = "utslpadmin"  # teclea esto rapido para alternar admin ON/OFF
+ADMIN_SECRET = "a"  # presiona la letra 'a' para abrir panel admin
 ADMIN_TYPING_TIMEOUT = 1.8   # segundos max entre teclas para que cuente
 
 # ============================

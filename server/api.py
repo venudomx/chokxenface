@@ -848,6 +848,46 @@ def delete_student_photo(student_id: int, session_token: str = Header(...)):
             
     return {"ok": True, "message": "Foto oficial eliminada correctamente. El alumno puede volver a subirla."}
 
+@api_router.get("/admin/debug_faces")
+def debug_faces():
+    try:
+        from fastapi.responses import HTMLResponse
+        # Ver rostros crudos usados p/ entrenar
+        records = PostgresWrapper.fetchall("SELECT id, student_id, image_base64, created_at FROM face_images ORDER BY student_id DESC, created_at DESC")
+        
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for r in records:
+            grouped[r["student_id"]].append(r)
+            
+        html = "<html><head><title>Debug Rostros DB</title><style>"
+        html += "body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }"
+        html += ".student-block { background: #222; padding: 15px; margin-bottom: 20px; border-radius: 8px; border-left: 5px solid #0d6efd; }"
+        html += ".gallery { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }"
+        html += ".img-card { background: #000; padding: 5px; border-radius: 4px; text-align: center; font-size: 11px; }"
+        html += "img { width: 100px; height: 100px; object-fit: cover; border-radius: 4px; }"
+        html += "</style></head><body><h1>Visor de Base de Datos de Rostros (LBPH)</h1>"
+        html += "<p>Aquí ves exactamente con qué imágenes se entrenó el modelo. Si hay caras mezcladas de otra persona en el ID equivocado, por eso te confunde.</p>"
+        
+        if not grouped:
+            html += "<p>No hay rostros registrados.</p>"
+            
+        for sid, imgs in grouped.items():
+            html += f"<div class='student-block'><h2>ID Alumno: {sid} ({len(imgs)} fotos)</h2>"
+            html += "<div class='gallery'>"
+            for img in imgs:
+                img_data = img["image_base64"]
+                if not img_data.startswith("data:"):
+                    img_data = f"data:image/jpeg;base64,{img_data}"
+                date_str = str(img["created_at"])[:16]
+                html += f"<div class='img-card'><img src='{img_data}' alt='face'/><br/>ID img: {img['id']}<br/>{date_str}</div>"
+            html += "</div></div>"
+            
+        html += "</body></html>"
+        return HTMLResponse(content=html)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/admin/students")
 def get_all_students_admin(session_token: str = Header(...)):
     sess = get_session(session_token)
