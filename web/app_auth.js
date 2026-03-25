@@ -143,15 +143,34 @@ async function handleGoogleCallback(resp) {
             headers: { "Authorization": `Bearer ${googleToken}` }
         });
         const data = await res.json();
+        
+        if (!res.ok) {
+            $("ginfo").textContent = data.detail || data.msg || "Acceso denegado.";
+            $("ginfo").style.color = "#ff4a4a";
+            return;
+        }
+        
         if (data.registered && data.token) {
             localStorage.setItem("fatoken", data.token);
             localStorage.setItem("farole", "student");
             window.location.href = "student.html";
             return;
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error(e);
+        $("ginfo").textContent = "Error al conectar con el servidor.";
+        return;
+    }
 
-    // 3) New student → Register
+    // 3) New student -> Register
+    try {
+        const payload = JSON.parse(atob(googleToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if ($("reg-nombre")) $("reg-nombre").value = payload.name || "";
+        const memail = payload.email || "";
+        const match = memail.split('@')[0].match(/\d+/);
+        if ($("reg-matricula")) $("reg-matricula").value = match ? match[0] : "";
+    } catch(e) { console.error("JWT Decode error", e); }
+
     showView("v-register");
     setActiveStep(1);
 }
