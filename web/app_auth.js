@@ -158,10 +158,10 @@ async function handleGoogleCallback(resp) {
 
 // ==================== PASO 1: DATOS → CONTINUAR ====================
 $("btnNextToLiveness").addEventListener("click", () => {
-    const nombre = $("reg-nombre").value.trim();
-    const matricula = $("reg-matricula").value.trim();
-    const carrera = $("reg-carrera").value.trim();
-    if (!nombre || !matricula || !carrera) {
+    const fnac = $("reg-fecha-nac").value;
+    const carrera = $("reg-carrera").value;
+    const genero = $("reg-genero").value;
+    if (!fnac || !carrera || !genero) {
         alert("Completa todos los campos antes de continuar.");
         return;
     }
@@ -337,8 +337,7 @@ async function submitRegistration() {
     setProgress(95);
 
     const fd = new FormData();
-    fd.append("nombre", $("reg-nombre").value.trim());
-    fd.append("matricula", $("reg-matricula").value.trim());
+    fd.append("fecha_nacimiento", $("reg-fecha-nac").value);
     fd.append("carrera", $("reg-carrera").value.trim());
     fd.append("genero", $("reg-genero") ? $("reg-genero").value.trim() : "O");
 
@@ -366,7 +365,7 @@ async function submitRegistration() {
                 localStorage.setItem("fatoken", data.token);
                 localStorage.setItem("farole", data.role);
                 if (data.student_id) { localStorage.setItem("fa_student_id", data.student_id); }
-                localStorage.setItem("fa_matricula", $("reg-matricula").value.trim());
+                localStorage.setItem("fa_matricula", data.matricula);
                 localStorage.setItem("fa_carrera", $("reg-carrera").value.trim());
             }
 

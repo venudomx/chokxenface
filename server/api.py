@@ -127,6 +127,10 @@ def db():
         con.execute("ALTER TABLE students ADD COLUMN genero TEXT DEFAULT 'O'")
     except Exception:
         pass
+    try:
+        con.execute("ALTER TABLE students ADD COLUMN fecha_nacimiento TEXT DEFAULT ''")
+    except Exception:
+        pass
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS events (
@@ -206,7 +210,7 @@ def db():
 def load_labels() -> Dict[str, Any]:
     try:
         con_db = db()
-        cur_db = con_db.execute("SELECT id, matricula, nombre, carrera, email, genero FROM students")
+        cur_db = con_db.execute("SELECT id, matricula, nombre, carrera, email, genero, fecha_nacimiento FROM students")
         rows = cur_db.fetchall()
         con_db.close()
         
@@ -221,7 +225,8 @@ def load_labels() -> Dict[str, Any]:
                 "nombre": r["nombre"],
                 "carrera": r["carrera"],
                 "email": r["email"],
-                "genero": r["genero"] if "genero" in r.keys() else "O"
+                "genero": r["genero"] if "genero" in r.keys() else "O",
+                "fecha_nacimiento": r["fecha_nacimiento"] if "fecha_nacimiento" in r.keys() else ""
             }
         labels["next_id"] = max_id
         
@@ -250,12 +255,13 @@ def find_student_id_by_matricula(labels: Dict[str, Any], matricula: str) -> Opti
     return None
 
 
-def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera: str, email: str, genero: str = "O") -> int:
+def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera: str, email: str, genero: str = "O", fecha_nac: str = "") -> int:
     matricula = matricula.strip()
     nombre = nombre.strip()
     carrera = carrera.strip()
     email = email.strip()
     genero = genero.strip() if genero else "O"
+    fecha_nac = fecha_nac.strip() if fecha_nac else ""
 
     sid = find_student_id_by_matricula(labels, matricula)
     if sid is None:
@@ -268,6 +274,7 @@ def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera:
         "carrera": carrera,
         "email": email,
         "genero": genero,
+        "fecha_nacimiento": fecha_nac,
         "updated_at": now_str(),
     }
     save_labels(labels)
@@ -275,15 +282,16 @@ def upsert_student(labels: Dict[str, Any], matricula: str, nombre: str, carrera:
     con = db()
     con.execute(
         """
-        INSERT INTO students (id, matricula, nombre, carrera, email, created_at, genero)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO students (id, matricula, nombre, carrera, email, created_at, genero, fecha_nacimiento)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(matricula) DO UPDATE SET
             nombre=excluded.nombre,
             carrera=excluded.carrera,
             email=excluded.email,
-            genero=excluded.genero
+            genero=excluded.genero,
+            fecha_nacimiento=excluded.fecha_nacimiento
         """,
-        (sid, matricula, nombre, carrera, email, now_str(), genero),
+        (sid, matricula, nombre, carrera, email, now_str(), genero, fecha_nac),
     )
     con.commit()
     con.close()
@@ -327,12 +335,12 @@ def verify_google(auth_header: Optional[str]) -> Dict[str, Any]:
         
         # Seguridad estricta: Solo permitir dominios de la universidad (utslp.edu.mx, plataforma-utslp.net, etc.)
         # Si ALLOWED_DOMAIN esta vacio por variable de entorno, forzamos por defecto utslp.edu.mx
-        domain_to_check = ALLOWED_DOMAIN if ALLOWED_DOMAIN else "utslp.edu.mx"
-        allowed_domains = [domain_to_check, "plataforma-utslp.net", "alumnos.utslp.edu.mx", "docentes.utslp.edu.mx"]
+        domain_to_check = ALLOWED_DOMAIN if ALLOWED_DOMAIN else "plataforma-utslp.net"
+        allowed_domains = [domain_to_check]
         
         ok_domain = any(email.endswith("@" + d) or hd == d for d in allowed_domains)
         if not ok_domain and email not in ADMIN_EMAILS:
-            raise HTTPException(status_code=403, detail="Acceso denegado: Usa tu correo institucional UTSLP (no se permiten cuentas personales)")
+            raise HTTPException(status_code=403, detail="Acceso denegado: Usa cuenta exclusivamenta terminada en @plataforma-utslp.net")
 
     return {"ok": True, "email": email, "name": name}
 
@@ -446,10 +454,11 @@ def api_train(authorization: Optional[str] = Header(default=None)):
 @api_router.post("/register")
 async def register(
     background_tasks: BackgroundTasks,
-    matricula: str = Form(...),
     carrera: str = Form(...),
-    nombre: str = Form(""),
     genero: str = Form("O"),
+    fecha_nacimiento: str = Form(""),
+    matricula: str = Form(""),
+    nombre: str = Form(""),
     files: List[UploadFile] = File(...),
     authorization: Optional[str] = Header(default=None),
 ):
@@ -465,10 +474,21 @@ async def register(
         nombre_final = nombre.strip()
 
     if not nombre_final:
-        raise HTTPException(status_code=400, detail="Falta nombre")
+        raise HTTPException(status_code=400, detail="Falta nombre y no se pudo obtener de Google")
+
+    matricula_final = matricula.strip()
+    if not matricula_final and email:
+        import re
+        username = email.split('@')[0]
+        digits = re.sub(r'\D', '', username)
+        if digits:
+            matricula_final = digits
+
+    if not matricula_final:
+        raise HTTPException(status_code=400, detail="Falta matricula y no se pudo deducir del correo")
 
     labels = load_labels()
-    sid = upsert_student(labels, matricula, nombre_final, carrera, email, genero)
+    sid = upsert_student(labels, matricula_final, nombre_final, carrera, email, genero, fecha_nacimiento)
 
     out_dir = DATASET_DIR / str(sid)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -533,7 +553,7 @@ async def register(
         "saved": saved,
         "skipped": skipped,
         "nombre": nombre_final,
-        "matricula": matricula,
+        "matricula": matricula_final,
         "carrera": carrera,
         "email": email,
     }
