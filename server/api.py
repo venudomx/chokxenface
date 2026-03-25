@@ -339,8 +339,8 @@ def verify_google(auth_header: Optional[str]) -> Dict[str, Any]:
         allowed_domains = [domain_to_check]
         
         ok_domain = any(email.endswith("@" + d) or hd == d for d in allowed_domains)
-        if not ok_domain and email not in ADMIN_EMAILS:
-            raise HTTPException(status_code=403, detail="Acceso denegado: Usa cuenta exclusivamenta terminada en @plataforma-utslp.net")
+        if not ok_domain:
+            raise HTTPException(status_code=403, detail="Acceso denegado: Usa cuenta exclusivamente @plataforma-utslp.net")
 
     return {"ok": True, "email": email, "name": name}
 
