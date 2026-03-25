@@ -333,10 +333,8 @@ def verify_google(auth_header: Optional[str]) -> Dict[str, Any]:
         if not email:
             raise HTTPException(status_code=401, detail="No hay email en el token")
         
-        # Seguridad estricta: Solo permitir dominios de la universidad (utslp.edu.mx, plataforma-utslp.net, etc.)
-        # Si ALLOWED_DOMAIN esta vacio por variable de entorno, forzamos por defecto utslp.edu.mx
-        domain_to_check = ALLOWED_DOMAIN if ALLOWED_DOMAIN else "plataforma-utslp.net"
-        allowed_domains = [domain_to_check]
+        # Seguridad inquebrantable: Quemamos el dominio en código
+        allowed_domains = ["plataforma-utslp.net"]
         
         ok_domain = any(email.endswith("@" + d) or hd == d for d in allowed_domains)
         if not ok_domain:
