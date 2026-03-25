@@ -510,4 +510,3 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
-
