@@ -329,16 +329,15 @@ def verify_google(auth_header: Optional[str]) -> Dict[str, Any]:
     name = str(info.get("name", "")).strip()
     hd = str(info.get("hd", "")).lower().strip()
 
-    if AUTH_MODE == "google":
-        if not email:
-            raise HTTPException(status_code=401, detail="No hay email en el token")
-        
-        # Seguridad inquebrantable: Quemamos el dominio en código
-        allowed_domains = ["plataforma-utslp.net"]
-        
-        ok_domain = any(email.endswith("@" + d) or hd == d for d in allowed_domains)
-        if not ok_domain:
-            raise HTTPException(status_code=403, detail="Acceso denegado: Usa cuenta exclusivamente @plataforma-utslp.net")
+    if not email:
+        raise HTTPException(status_code=401, detail="No hay email en el token")
+    
+    # Seguridad absoluta e incondicional
+    allowed_domains = ["plataforma-utslp.net"]
+    
+    ok_domain = any(email.endswith("@" + d) or hd == d for d in allowed_domains)
+    if not ok_domain:
+        raise HTTPException(status_code=403, detail="Acceso denegado: Usa cuenta exclusivamente @plataforma-utslp.net")
 
     return {"ok": True, "email": email, "name": name}
 
