@@ -20,6 +20,7 @@ DATASET_DIR = os.path.join(PROJECT_DIR, "dataset")
 LBPH_FILE = os.path.join(PROJECT_DIR, "lbph_model.yml")
 LABELS_FILE = os.path.join(PROJECT_DIR, "labels.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs.csv")
+STUDENT_STATES_FILE = os.path.join(PROJECT_DIR, "student_states.json")
 
 # ============================
 # Config camara / rendimiento
@@ -42,7 +43,7 @@ FACE_SIZE = (200, 200)
 BLINK_EAR_THRESH = 0.30
 BLINK_COOLDOWN_SEC = 0.20
 LIVENESS_WINDOW_SEC = 6.0
-BLINKS_REQUIRED = 1      # 1 = Requiere un parpadeo para probar que es persona
+BLINKS_REQUIRED = 2      # 2 = Requiere dos parpadeos como instruyó el sysadmin
 LIVENESS_HOLD_SEC = 3.0
 
 # ============================
@@ -163,6 +164,26 @@ def load_labels():
 def save_labels(labels):
     with open(LABELS_FILE, "w", encoding="utf-8") as f:
         json.dump(labels, f, indent=2, ensure_ascii=False)
+
+def load_states():
+    if os.path.exists(STUDENT_STATES_FILE):
+        try:
+            mtime = os.path.getmtime(STUDENT_STATES_FILE)
+            file_date = datetime.fromtimestamp(mtime).date()
+            if file_date < datetime.now().date():
+                return {} # Resetea estatus cada dia
+            with open(STUDENT_STATES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_states(states):
+    try:
+        with open(STUDENT_STATES_FILE, "w", encoding="utf-8") as f:
+            json.dump(states, f, ensure_ascii=False)
+    except:
+        pass
 
 def get_or_create_label_id(labels, name):
     for k, v in labels.get("students", {}).items():
@@ -533,8 +554,9 @@ def main():
         if not ok or frame is None:
             continue
 
-        frame = cv2.flip(frame, 1)
         frame = cv2.resize(frame, (CAP_W, CAP_H))
+        qr_frame = frame.copy()  # Fotograma crudo SIN espejo (crucial para que el QR sea legible)
+        frame = cv2.flip(frame, 1)
 
         frames_counter += 1
         dt = time.time() - t0
@@ -554,7 +576,7 @@ def main():
 
         # Inferencia QR (cada 3 frames para no saturar CPU)
         if frame_i % 3 == 0:
-            qr_data, _, _ = qr_decoder.detectAndDecode(frame)
+            qr_data, _, _ = qr_decoder.detectAndDecode(qr_frame)
             if qr_data and qr_data.startswith("UTSLP-ALUMNO-"):
                 try:
                     parts = qr_data.split("-")
@@ -562,6 +584,23 @@ def main():
                         sid_str = parts[3]
                         if sid_str in labels.get("students", {}):
                             s_name = labels["students"][sid_str]
+                            
+                            # Logica estricta de Entrada -> Salida
+                            last_state = student_states.get(str(sid_str), "salida")
+                            if event_type == "entrada" and last_state == "entrada":
+                                toast_msg = "QR Denegado: Ya estas dentro."
+                                toast_until = nowt + 5.0
+                                speak_async("Acceso denegado, ya tienes registro de entrada.")
+                                continue
+                            if event_type == "salida" and last_state == "salida":
+                                toast_msg = "QR Denegado: Afuera."
+                                toast_until = nowt + 5.0
+                                speak_async("Acceso denegado, no tienes registro de entrada previo.")
+                                continue
+                                
+                            student_states[str(sid_str)] = event_type
+                            save_states(student_states)
+                            
                             # Otorgar acceso inmediatamente
                             last_name = s_name
                             last_conf = 0.0
@@ -785,6 +824,28 @@ def main():
                                 match_id = int(k)
                                 break
                         if match_id is not None:
+                            # Logica estricta de Entrada -> Salida
+                            last_state = student_states.get(str(match_id), "salida")
+                            if event_type == "entrada" and last_state == "entrada":
+                                toast_msg = "Acceso Denegado: Ya estas dentro."
+                                toast_until = nowt + 5.0
+                                speak_async("Acceso denegado, ya tienes registro de entrada.")
+                                liveness_ok_display = False
+                                vote_buffer.clear()
+                                unknown_streak += 1
+                                continue
+                            if event_type == "salida" and last_state == "salida":
+                                toast_msg = "Acceso Denegado: Afuera."
+                                toast_until = nowt + 5.0
+                                speak_async("Acceso denegado, no tienes registro de entrada previo.")
+                                liveness_ok_display = False
+                                vote_buffer.clear()
+                                unknown_streak += 1
+                                continue
+                                
+                            student_states[str(match_id)] = event_type
+                            save_states(student_states)
+
                             requests.post(f"{API_URL}?student_id={match_id}&event_type={event_type}&camera={cam_idx}&source=laptop", timeout=1.0)
                     except:
                         pass
@@ -1020,6 +1081,7 @@ def main():
             # Recargar el modelo LBPH actualizado
             recognizer = load_lbph_if_exists()
             labels = load_labels()
+            student_states = load_states()
             vote_buffer.clear()
             last_name = "DESCONOCIDO"
             last_conf = None
