@@ -378,6 +378,51 @@ def extract_face_gray(img_bgr: np.ndarray) -> Optional[np.ndarray]:
     return cv2.resize(face, FACE_SIZE)
 
 
+def extract_face_color(img_bgr: np.ndarray) -> Optional[np.ndarray]:
+    """Extrae rostro a COLOR con 20% de margen (optimo para ArcFace ONNX)."""
+    h, w = img_bgr.shape[:2]
+
+    if USE_MEDIAPIPE and _mp_fd is not None:
+        try:
+            rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            res = _mp_fd.process(rgb)
+            if res.detections:
+                det = max(res.detections, key=lambda d: d.location_data.relative_bounding_box.width)
+                bb = det.location_data.relative_bounding_box
+                x = max(0, int(bb.xmin * w))
+                y = max(0, int(bb.ymin * h))
+                fw = min(int(bb.width * w), w - x)
+                fh = min(int(bb.height * h), h - y)
+                if fw > 30 and fh > 30:
+                    # Margen 20%
+                    px = int(fw * 0.2)
+                    py = int(fh * 0.2)
+                    nx1 = max(0, x - px)
+                    ny1 = max(0, y - py)
+                    nx2 = min(w, x + fw + px)
+                    ny2 = min(h, y + fh + py)
+                    return img_bgr[ny1:ny2, nx1:nx2]
+        except Exception:
+            pass
+
+    # Fallback: Haar
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=5, minSize=(80, 80))
+    if len(faces) == 0:
+        return None
+    x, y, fw, fh = sorted(faces, key=lambda r: r[2] * r[3], reverse=True)[0]
+    px = int(fw * 0.2)
+    py = int(fh * 0.2)
+    nx1 = max(0, x - px)
+    ny1 = max(0, y - py)
+    nx2 = min(w, x + fw + px)
+    ny2 = min(h, y + fh + py)
+    face = img_bgr[ny1:ny2, nx1:nx2]
+    if face.size == 0:
+        return None
+    return face
+
+
 def train_lbph() -> Dict[str, Any]:
     ensure_dirs()
     labels = load_labels()
@@ -502,16 +547,16 @@ async def register(
                 skipped += 1
                 continue
 
-            face = extract_face_gray(img)
+            face = extract_face_color(img)  # COLOR con margen para ArcFace
             if face is None:
                 skipped += 1
                 continue
 
-            out_path = out_dir / f"{int(time.time()*1000)}_{saved}.png"
-            cv2.imwrite(str(out_path), face)
+            out_path = out_dir / f"{int(time.time()*1000)}_{saved}.jpg"
+            cv2.imwrite(str(out_path), face)  # Guardar a color (BGR)
             
             # Guardar tambien en PostgreSQL para persistencia
-            _, buffer = cv2.imencode('.png', face)
+            _, buffer = cv2.imencode('.jpg', face)
             b64_face = base64.b64encode(buffer).decode('utf-8')
             con = db()
             con.execute("INSERT INTO face_images (student_id, image_base64) VALUES (?, ?)", (sid, b64_face))
@@ -531,7 +576,8 @@ async def register(
             "skipped": skipped,
         }
 
-    # Automatically trigger training in background
+    # ArcFace no necesita entrenamiento servidor — los embeddings se generan localmente
+    # Mantener train_lbph para backward-compat si se necesita
     background_tasks.add_task(train_lbph)
 
     token = str(uuid.uuid4())

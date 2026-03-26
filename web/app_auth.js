@@ -11,7 +11,7 @@ let blinks = 0, lastLidClosed = false, lastBlinkTime = 0, livenessPassed = false
 // Scan phases
 let scanPhase = 0; // 0=idle, 1=liveness, 2=frontal, 3=izq, 4=der
 let capturedBlobs = [];
-const PHASE_SHOTS = { 2: 20, 3: 15, 4: 15 }; // 20 frontal + 15 izq + 15 der = 50 tomas
+const PHASE_SHOTS = { 2: 10, 3: 8, 4: 8 }; // 10 frontal + 8 izq + 8 der = 26 tomas (ArcFace: calidad > cantidad)
 
 function showView(id) {
     document.querySelectorAll('.view').forEach(v => {
@@ -282,11 +282,11 @@ async function captureBlob(vid) {
     const c = document.createElement("canvas");
     const vw = vid.videoWidth || 640;
     const vh = vid.videoHeight || 480;
-    const scale = Math.min(1.0, 360 / vw); // Reducir a max 360px de ancho para agilizar
+    const scale = Math.min(1.0, 480 / vw); // 480px para ArcFace (mayor detalle facial)
     c.width = Math.round(vw * scale); 
     c.height = Math.round(vh * scale);
     c.getContext("2d").drawImage(vid, 0, 0, c.width, c.height);
-    return new Promise(r => c.toBlob(r, "image/jpeg", 0.70)); // Alta compresión = envío rápido
+    return new Promise(r => c.toBlob(r, "image/jpeg", 0.90)); // 90% calidad para mejor embedding
 }
 
 async function startCapturePhase(phase) {
@@ -324,7 +324,7 @@ async function startCapturePhase(phase) {
         capturedBlobs.push(blob);
 
         const totalDone = capturedBlobs.length;
-        const pct = 20 + (totalDone / 50) * 80; // Scale 50 shots
+        const pct = 20 + (totalDone / 26) * 80; // Scale 26 shots (ArcFace)
         setProgress(pct);
         $("liveness-msg").textContent = "Mapeando geometria facial...";
         $("reg-status").textContent = `${cfg.title} — Procesando`;

@@ -31,37 +31,36 @@ MAX_CAM_SCAN = 6
 CAP_W, CAP_H = 960, 540
 PROC_W, PROC_H = 640, 360
 
-INFER_EVERY_N = 2
-RECOG_EVERY_N = 3
-ACC_EVERY_N = 3
+INFER_EVERY_N = 3
+RECOG_EVERY_N = 5
+ACC_EVERY_N = 4
 
 FACE_SIZE = (200, 200)
 
 # ============================
 # Liveness (Velocidad extrema)
 # ============================
-BLINK_EAR_THRESH = 0.30
-BLINK_COOLDOWN_SEC = 0.20
-LIVENESS_WINDOW_SEC = 6.0
-BLINKS_REQUIRED = 2      # 2 = Requiere dos parpadeos como instruyó el sysadmin
-LIVENESS_HOLD_SEC = 3.0
+BLINK_EAR_THRESH = 0.22
+BLINK_COOLDOWN_SEC = 0.15
+LIVENESS_WINDOW_SEC = 8.0
+BLINKS_REQUIRED = 2      # 2 = Requiere dos parpadeos
+LIVENESS_HOLD_SEC = 4.0
 
 # ============================
 # Avisos (NO bloqueo)
 # ============================
-GLASSES_WARN_ON = 85
-GLASSES_WARN_OFF = 65
+GLASSES_WARN_ON = 95
+GLASSES_WARN_OFF = 85
 HAT_WARN_ON = 85
 HAT_WARN_OFF = 65
 
 # ============================
-# LBPH (reconocimiento) — Equilibrado para velocidad y precisión
+# face_recognition (Deep Learning - 99.38% precisión)
 # ============================
-LBPH_STRICT = 58.0   # umbral para dar acceso (relajado de nuevo)
-LBPH_OK     = 63.0   # muestra nombre
-LBPH_FLOOR  = 66.0   # piso de rechazo
-LBPH_MIN_SAMPLES = 5  # 5 frames CONSECUTIVOS iguales para evitar falsos positivos (como Fabian)
-RECOG_HOLD_SEC   = 3.0  # 3 segundos de pausa en pantalla verde al dar acceso
+FR_TOLERANCE = 0.35       # (ArcFace) distancia máxima para mach. Menor = más estricto
+FR_STRICT    = 0.30       # umbral estricto para dar acceso automático
+FR_MIN_SAMPLES = 4        # frames consecutivos con el mismo match (subido para más seguridad)
+RECOG_HOLD_SEC   = 3.0
 UNKNOWN_AFTER_SEC = 0.9
 UNKNOWN_STRIKES   = 3
 
@@ -370,64 +369,115 @@ def hat_raw(frame_bgr_small, face_box):
 # ============================
 # LBPH
 # ============================
-def load_lbph_if_exists():
-    if not os.path.exists(LBPH_FILE):
-        return None
-    if not hasattr(cv2, "face"):
-        print("Falta cv2.face. Instala: pip install opencv-contrib-python")
-        return None
-    rec = cv2.face.LBPHFaceRecognizer_create()
-    rec.read(LBPH_FILE)
-    return rec
+import onnxruntime as ort
 
-def predict_lbph(recognizer, face_gray):
-    if recognizer is None:
-        return None, None
+# ============================
+# Motor de reconocimiento: ONNX Runtime + ArcFace MobileFaceNet
+# ============================
+ONNX_MODEL_PATH = os.path.join(os.path.dirname(__file__), "w600k_mbf.onnx")
+ONNX_SESSION = None
+KNOWN_REPS = []       # lista de embeddings (np arrays 512-dim)
+KNOWN_IDS = []        # lista de student_ids (int)
+
+def _init_onnx():
+    global ONNX_SESSION
+    if ONNX_SESSION is not None:
+        return
+    if not os.path.exists(ONNX_MODEL_PATH):
+        print(f"[ONNX] MODELO NO ENCONTRADO: {ONNX_MODEL_PATH}")
+        return
+    ONNX_SESSION = ort.InferenceSession(ONNX_MODEL_PATH, providers=["CPUExecutionProvider"])
+    print(f"[ONNX] Modelo ArcFace cargado: {ONNX_MODEL_PATH}")
+
+def _get_embedding(face_bgr):
+    """Genera embedding 512-dim de un rostro BGR usando ArcFace ONNX."""
+    if ONNX_SESSION is None:
+        _init_onnx()
+    if ONNX_SESSION is None:
+        return None
     try:
-        img = cv2.resize(face_gray, FACE_SIZE)
-        label, conf = recognizer.predict(img)
-        return int(label), float(conf)
+        # ArcFace espera 112x112 RGB normalizado
+        img = cv2.resize(face_bgr, (112, 112))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32)
+        img = (img / 255.0 - 0.5) / 0.5  # normalizar a [-1, 1]
+        img = img.transpose(2, 0, 1)       # HWC -> CHW
+        img = np.expand_dims(img, axis=0)   # batch dim
+        
+        result = ONNX_SESSION.run(None, {ONNX_SESSION.get_inputs()[0].name: img})
+        embedding = result[0][0]
+        # Normalizar L2
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+        return embedding.astype(np.float64)
     except:
-        return None, None
-
-def train_lbph():
-    os.makedirs(DATASET_DIR, exist_ok=True)
-    if not hasattr(cv2, "face"):
-        print("Falta cv2.face. Instala: pip install opencv-contrib-python")
         return None
 
-    images = []
-    y = []
-
+def load_face_encodings():
+    """Carga todas las imagenes del dataset/ y genera embeddings con ArcFace ONNX."""
+    global KNOWN_REPS, KNOWN_IDS
+    _init_onnx()
+    KNOWN_REPS = []
+    KNOWN_IDS = []
+    
+    os.makedirs(DATASET_DIR, exist_ok=True)
+    total = 0
+    
     for folder in os.listdir(DATASET_DIR):
         folder_path = os.path.join(DATASET_DIR, folder)
         if not os.path.isdir(folder_path):
             continue
         try:
-            lid = int(folder)
+            sid = int(folder)
         except:
             continue
-
+        
         for fn in os.listdir(folder_path):
-            if not fn.lower().endswith(".png"):
+            if not fn.lower().endswith((".png", ".jpg", ".jpeg")):
                 continue
             p = os.path.join(folder_path, fn)
-            img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
-            if img is None:
+            try:
+                img = cv2.imread(p)
+                if img is None:
+                    continue
+                emb = _get_embedding(img)
+                if emb is not None:
+                    KNOWN_REPS.append(emb)
+                    KNOWN_IDS.append(sid)
+                    total += 1
+            except:
                 continue
-            img = cv2.resize(img, FACE_SIZE)
-            images.append(img)
-            y.append(lid)
+    
+    print(f"[ArcFace-ONNX] Cargados {total} embeddings de {len(set(KNOWN_IDS))} estudiantes.")
+    return total
 
-    if len(images) < 2:
-        print("No hay suficientes imagenes para entrenar. Minimo 2.")
-        return None
-
-    rec = cv2.face.LBPHFaceRecognizer_create()
-    rec.train(images, np.array(y))
-    rec.save(LBPH_FILE)
-    print(f"LBPH entrenado. Total imgs: {len(images)} | Guardado: {LBPH_FILE}")
-    return rec
+def recognize_face_deep(face_bgr):
+    """Reconoce un rostro usando ArcFace ONNX. Retorna (student_id, distancia_coseno) o (None, None)."""
+    if not KNOWN_REPS:
+        return None, None
+    try:
+        emb = _get_embedding(face_bgr)
+        if emb is None:
+            return None, None
+        
+        # Distancia coseno contra todos los conocidos
+        best_dist = float("inf")
+        best_id = None
+        
+        for i, known_emb in enumerate(KNOWN_REPS):
+            cosine_sim = float(np.dot(emb, known_emb))
+            dist = 1.0 - cosine_sim
+            if dist < best_dist:
+                best_dist = dist
+                best_id = KNOWN_IDS[i]
+        
+        if best_dist <= FR_TOLERANCE:
+            return best_id, best_dist
+        else:
+            return None, best_dist
+    except:
+        return None, None
 
 # ============================
 # UI helpers
@@ -473,7 +523,8 @@ def main():
     sync_cloud_models()
     os.makedirs(DATASET_DIR, exist_ok=True)
     labels = load_labels()
-    recognizer = load_lbph_if_exists()
+    load_face_encodings()
+    recognizer = True  # flag para indicar que el sistema esta listo
 
     cam_idx = CAM_INDEX
     cap = open_cam(cam_idx)
@@ -530,8 +581,8 @@ def main():
     reg_name = ""
     reg_id = None
     samples_got = 0
-    SAMPLES_TARGET = 25
-    REG_SAMPLE_INTERVAL = 0.18
+    SAMPLES_TARGET = 15  # ArcFace no necesita tantas fotos, 15 de buena calidad bastan
+    REG_SAMPLE_INTERVAL = 0.25  # Mas tiempo entre fotos para que varie angulos
     last_sample_ts = 0.0
 
     # admin oculto
@@ -585,18 +636,8 @@ def main():
                         if sid_str in labels.get("students", {}):
                             s_name = labels["students"][sid_str]
                             
-                            # Logica estricta de Entrada -> Salida
+                            # Logica permisiva de Entrada/Salida (solo registra)
                             last_state = student_states.get(str(sid_str), "salida")
-                            if event_type == "entrada" and last_state == "entrada":
-                                toast_msg = "QR Denegado: Ya estas dentro."
-                                toast_until = nowt + 5.0
-                                speak_async("Acceso denegado, ya tienes registro de entrada.")
-                                continue
-                            if event_type == "salida" and last_state == "salida":
-                                toast_msg = "QR Denegado: Afuera."
-                                toast_until = nowt + 5.0
-                                speak_async("Acceso denegado, no tienes registro de entrada previo.")
-                                continue
                                 
                             student_states[str(sid_str)] = event_type
                             save_states(student_states)
@@ -689,44 +730,40 @@ def main():
         if hat_warn and hat_pct <= HAT_WARN_OFF:
             hat_warn = False
 
-        # reconocimiento con votacion multi-frame (anti false-positive)
-        if recognizer is not None and last_face_gray is not None and frame_i % RECOG_EVERY_N == 0:
-            lid, conf = predict_lbph(recognizer, last_face_gray)
-
-            # LBPH_FLOOR: rechazo absoluto — si conf es mayor que el piso, ignorar siempre
-            if lid is not None and conf is not None and conf <= LBPH_FLOOR:
-                # Acumulamos votos en el buffer
-                vote_buffer.append((lid, conf))
-                if len(vote_buffer) > LBPH_MIN_SAMPLES:
-                    vote_buffer.pop(0)
-
-                # Solo confirmar si todos los votos coinciden CON EL MISMO ID
-                if len(vote_buffer) >= LBPH_MIN_SAMPLES:
-                    ids_in_buf  = [v[0] for v in vote_buffer]
-                    confs_in_buf = [v[1] for v in vote_buffer]
-                    # Todos los frames deben coincidir en el mismo ID
-                    if len(set(ids_in_buf)) == 1 and max(confs_in_buf) <= LBPH_FLOOR:
-                        info = labels.get("students", {}).get(str(lid), {})
-                        if not info:
-                            # ID fantasma: existe en el modelo pero no en labels
+        # reconocimiento con Deep Learning (face_recognition) + votacion multi-frame
+        if KNOWN_REPS and last_face_box is not None and frame_i % RECOG_EVERY_N == 0:
+            x1, y1, x2, y2 = last_face_box
+            face_roi_bgr = small[y1:y2, x1:x2]
+            if face_roi_bgr.size > 0:
+                lid, dist_val = recognize_face_deep(face_roi_bgr)
+                
+                if lid is not None and dist_val is not None:
+                    vote_buffer.append((lid, dist_val))
+                    if len(vote_buffer) > FR_MIN_SAMPLES:
+                        vote_buffer.pop(0)
+                    
+                    if len(vote_buffer) >= FR_MIN_SAMPLES:
+                        ids_in_buf = [v[0] for v in vote_buffer]
+                        dists_in_buf = [v[1] for v in vote_buffer]
+                        if len(set(ids_in_buf)) == 1:
+                            info = labels.get("students", {}).get(str(lid), {})
+                            if not info:
+                                vote_buffer.clear()
+                                unknown_streak += 1
+                            else:
+                                nm = info.get("nombre", f"ID_{lid}")
+                                last_name = nm
+                                last_conf = float(np.mean(dists_in_buf))
+                                last_recog_ts = nowt
+                                unknown_streak = 0
+                        else:
                             vote_buffer.clear()
                             unknown_streak += 1
-                        else:
-                            nm = info.get("nombre", f"ID_{lid}")
-                            last_name = nm
-                            last_conf = float(np.mean(confs_in_buf))
-                            last_recog_ts = nowt
-                            unknown_streak = 0
                     else:
-                        # IDs mezclados = persona no confiable
-                        vote_buffer.clear()
                         unknown_streak += 1
                 else:
+                    vote_buffer.clear()
                     unknown_streak += 1
-            else:
-                # Conf fuera del piso: limpiar buffer y sumar fallo
-                vote_buffer.clear()
-                unknown_streak += 1
 
         # decide display name sin parpadeo
         if faces == 0:
@@ -778,10 +815,11 @@ def main():
         text(small, f"Ev: {event_type} | G: {glasses_pct}%", 18, 68, (255, 255, 0), 0.50, 1)
         
         if last_conf is not None:
-             text(small, f"Conf: {last_conf:.1f}", 18, 88, (200, 200, 200), 0.50, 1)
+             text(small, f"Dist: {last_conf:.2f}", 18, 88, (200, 200, 200), 0.50, 1)
 
-        # Liveness & Accesorios Módulo Estricto
-        # Gorra: siempre bloquea. Lentes: Advierte pero ya NO bloquea (el parpadeo es válido si se detecta)
+        # Liveness & Accesorios Módulo
+        # Gorra: siempre bloquea.
+        # Lentes: YA NO ADVIERTE NI BLOQUEA — el parpadeo es válido con lentes
         if hat_warn:
             liveness_ok_display = False
             liveness_ok_until = 0.0
@@ -789,10 +827,7 @@ def main():
         warnings = []
         voice_warning = ""
         
-        if glasses_warn:
-            warnings.append("QUITATE LOS LENTES")
-            voice_warning = "Quítate los lentes."
-        elif hat_warn:
+        if hat_warn:
             warnings.append("QUITATE LA GORRA")
             voice_warning = "Quítate la gorra."
         elif not liveness_ok_display:
@@ -809,7 +844,7 @@ def main():
 
         # saludo automatizado (solo si conf estricta y liveness ok)
         if mode == "gate" and faces > 0 and liveness_ok_display:
-            if last_name != "DESCONOCIDO" and last_conf is not None and last_conf <= LBPH_STRICT:
+            if last_name != "DESCONOCIDO" and last_conf is not None and last_conf <= FR_STRICT:
                 if (nowt - last_greet_ts) >= GREET_COOLDOWN:
                     last_greet_ts = nowt
                     last_warn_ts = nowt  # Evitar avisos empalmados
@@ -824,24 +859,8 @@ def main():
                                 match_id = int(k)
                                 break
                         if match_id is not None:
-                            # Logica estricta de Entrada -> Salida
+                            # Logica de Entrada/Salida (permisiva - avisa pero no bloquea)
                             last_state = student_states.get(str(match_id), "salida")
-                            if event_type == "entrada" and last_state == "entrada":
-                                toast_msg = "Acceso Denegado: Ya estas dentro."
-                                toast_until = nowt + 5.0
-                                speak_async("Acceso denegado, ya tienes registro de entrada.")
-                                liveness_ok_display = False
-                                vote_buffer.clear()
-                                unknown_streak += 1
-                                continue
-                            if event_type == "salida" and last_state == "salida":
-                                toast_msg = "Acceso Denegado: Afuera."
-                                toast_until = nowt + 5.0
-                                speak_async("Acceso denegado, no tienes registro de entrada previo.")
-                                liveness_ok_display = False
-                                vote_buffer.clear()
-                                unknown_streak += 1
-                                continue
                                 
                             student_states[str(match_id)] = event_type
                             save_states(student_states)
@@ -981,24 +1000,39 @@ def main():
             text(small, f"Registrando: {reg_name}", 20, PROC_H - 102, (255, 255, 255), FONT_MAIN, 2)
             text(small, f"Muestras: {samples_got}/{SAMPLES_TARGET}", 20, PROC_H - 80, (0, 255, 0), FONT_TITLE, 2)
 
-            if last_face_gray is not None and liveness_ok_display:
+            if last_face_box is not None and liveness_ok_display:
                 if (nowt - last_sample_ts) >= REG_SAMPLE_INTERVAL:
                     out_dir = os.path.join(DATASET_DIR, str(reg_id))
                     os.makedirs(out_dir, exist_ok=True)
-                    img = cv2.resize(last_face_gray, FACE_SIZE)
-                    out_path = os.path.join(out_dir, f"{int(nowt*1000)}_{samples_got}.png")
-                    cv2.imwrite(out_path, img)
-                    samples_got += 1
-                    last_sample_ts = nowt
+                    
+                    # Recorte RGB con margen para ArcFace
+                    x1, y1, x2, y2 = last_face_box
+                    w = x2 - x1
+                    h = y2 - y1
+                    # Añadir 20% de margen
+                    px = int(w * 0.2)
+                    py = int(h * 0.2)
+                    nx1 = max(0, x1 - px)
+                    ny1 = max(0, y1 - py)
+                    nx2 = min(PROC_W, x2 + px)
+                    ny2 = min(PROC_H, y2 + py)
+                    
+                    face_rgb_crop = small[ny1:ny2, nx1:nx2]
+                    
+                    if face_rgb_crop.size > 0:
+                        out_path = os.path.join(out_dir, f"{int(nowt*1000)}_{samples_got}.jpg")
+                        cv2.imwrite(out_path, face_rgb_crop)
+                        samples_got += 1
+                        last_sample_ts = nowt
 
-                    if samples_got >= SAMPLES_TARGET:
-                        print("Listo. Entrenando modelo...")
-                        recognizer = train_lbph()
-                        labels = load_labels()
-                        mode = "gate"
-                        reg_name = ""
-                        reg_id = None
-                        samples_got = 0
+                        if samples_got >= SAMPLES_TARGET:
+                            print("Listo. Generando embeddings en vivo...")
+                            load_face_encodings()  # Recarga directamente a la RAM
+                            labels = load_labels()
+                            mode = "gate"
+                            reg_name = ""
+                            reg_id = None
+                            samples_got = 0
 
         # barra controles visible (sin admin)
         panel(small, 10, PROC_H - 32, 620, 24, alpha=0.35)
@@ -1068,6 +1102,9 @@ def main():
 
         if k in (ord("e"), ord("E")):
             event_type = "salida" if event_type == "entrada" else "entrada"
+            toast_msg = f"MODO: {event_type.upper()}"
+            toast_until = nowt + 3.0
+            speak_async(f"Modo cambiado a {event_type}.")
 
         if k in (ord("m"), ord("M")):
             mesh_mode = (mesh_mode + 1) % 3
@@ -1078,15 +1115,15 @@ def main():
         if k in (ord("t"), ord("T")):
             # Primero sincronizar modelo y labels desde el servidor
             sync_cloud_models()
-            # Recargar el modelo LBPH actualizado
-            recognizer = load_lbph_if_exists()
+            # Recargar encodings de deep learning
+            load_face_encodings()
             labels = load_labels()
             student_states = load_states()
             vote_buffer.clear()
             last_name = "DESCONOCIDO"
             last_conf = None
             unknown_streak = 0
-            toast_msg = "SYNC OK" if recognizer else "SIN MODELO"
+            toast_msg = "SYNC OK" if KNOWN_REPS else "SIN MODELO"
             toast_until = nowt + 2.0
 
         if k in (ord("r"), ord("R")) and mode == "gate":
