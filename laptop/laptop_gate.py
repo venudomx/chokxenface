@@ -119,30 +119,38 @@ def sync_cloud_models():
                 f.write(r_labels.content)
             print("labels.json actualizado desde la nube.")
         
-        # 2. Intentar descargar modelo
+        # 2. Intentar descargar modelo LBPH (backward compat)
         r_model = requests.get(f"{API_BASE}/model/lbph", timeout=15)
         
         if r_model.status_code == 404:
-            # Modelo no existe en servidor — forzar reentrenamiento remoto
-            print("Modelo no encontrado en la nube. Forzando entrenamiento remoto...")
-            try:
-                r_train = requests.post(f"{API_BASE}/train", timeout=60)
-                if r_train.status_code == 200:
-                    print("Entrenamiento remoto exitoso. Descargando modelo...")
-                    r_model = requests.get(f"{API_BASE}/model/lbph", timeout=15)
-                else:
-                    print(f"Error entrenando remotamente: {r_train.status_code} {r_train.text}")
-            except Exception as te:
-                print(f"Error al entrenar remotamente: {te}")
-        
-        if r_model.status_code == 200:
+            print("Modelo LBPH no encontrado (normal, ahora usamos ArcFace ONNX).")
+        elif r_model.status_code == 200:
             with open(LBPH_FILE, "wb") as f:
                 f.write(r_model.content)
             print("lbph_model.yml actualizado desde la nube.")
+        
+        # 3. Descargar fotos del dataset desde PostgreSQL → dataset/ local
+        print("Descargando fotos del dataset desde la nube...")
+        r_dataset = requests.get(f"{API_BASE}/dataset/sync", timeout=60)
+        if r_dataset.status_code == 200:
+            data = r_dataset.json()
+            if data.get("ok") and data.get("data"):
+                total_saved = 0
+                for sid, images_b64 in data["data"].items():
+                    out_dir = os.path.join(DATASET_DIR, str(sid))
+                    os.makedirs(out_dir, exist_ok=True)
+                    for idx, img_b64 in enumerate(images_b64):
+                        out_path = os.path.join(out_dir, f"cloud_{idx}.jpg")
+                        if not os.path.exists(out_path):
+                            img_data = base64.b64decode(img_b64)
+                            with open(out_path, "wb") as f:
+                                f.write(img_data)
+                            total_saved += 1
+                print(f"[SYNC] {total_saved} fotos nuevas descargadas de {len(data['data'])} estudiantes.")
+            else:
+                print("[SYNC] No hay fotos en la nube o error:", data.get("msg", ""))
         else:
-            print(f"No se pudo obtener el modelo: {r_model.status_code}")
-            if os.path.exists(LBPH_FILE):
-                os.remove(LBPH_FILE)
+            print(f"[SYNC] Error descargando dataset: {r_dataset.status_code}")
     except Exception as e:
         print("Aviso: No se pudo sincronizar con la nube (verifique su internet).", e)
 

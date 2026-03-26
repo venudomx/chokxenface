@@ -493,6 +493,27 @@ def api_train(authorization: Optional[str] = Header(default=None)):
     return result
 
 
+@api_router.get("/dataset/sync")
+def dataset_sync():
+    """Devuelve TODAS las fotos faciales de la BD, agrupadas por student_id."""
+    try:
+        con = db()
+        cur = con.execute("SELECT student_id, image_base64 FROM face_images")
+        rows = cur.fetchall()
+        con.close()
+        
+        result = {}  # { "student_id": ["base64_img1", "base64_img2", ...] }
+        for r in rows:
+            sid = str(r["student_id"])
+            if sid not in result:
+                result[sid] = []
+            result[sid].append(r["image_base64"])
+        
+        return {"ok": True, "data": result, "total": len(rows)}
+    except Exception as e:
+        return {"ok": False, "msg": str(e)}
+
+
 @api_router.post("/register")
 async def register(
     background_tasks: BackgroundTasks,
