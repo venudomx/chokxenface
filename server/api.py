@@ -553,7 +553,20 @@ async def register(
     labels = load_labels()
     sid = upsert_student(labels, matricula_final, nombre_final, carrera, email, genero, fecha_nacimiento)
 
+    # Limpiar fotos anteriores (evita mezclar LBPH gris con ArcFace color)
+    try:
+        con = db()
+        con.execute("DELETE FROM face_images WHERE student_id = ?", (sid,))
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+    
     out_dir = DATASET_DIR / str(sid)
+    # Borrar carpeta vieja completamente
+    import shutil
+    if out_dir.exists():
+        shutil.rmtree(out_dir, ignore_errors=True)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     saved = 0
